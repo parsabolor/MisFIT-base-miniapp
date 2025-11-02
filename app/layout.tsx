@@ -1,6 +1,5 @@
 import "./globals.css"
 import type { Metadata } from "next"
-import { RootProvider } from "./rootProvider"
 
 export const metadata: Metadata = {
   title: "MisFIT Check-ins",
@@ -18,9 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-background text-foreground antialiased">
-        <RootProvider>
-          <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">{children}</main>
-        </RootProvider>
+        {children}
       </body>
     </html>
   )
