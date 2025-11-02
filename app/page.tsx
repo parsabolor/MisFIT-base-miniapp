@@ -1,69 +1,42 @@
-'use client'
-import React, { useEffect, useMemo, useState } from 'react'
-import { useAccount } from 'wagmi'
-import { StatsCard } from '@/components/StatsCard'
-import { ProgressBar } from '@/components/ProgressBar'
-import Link from 'next/link'
-import { getStats, isSameUTCDay } from '@/lib/storage'
+import { StatsCard } from "@/components/StatsCard"
+import { ProgressBar } from "@/components/ProgressBar"
 
-export default function DashboardPage() {
-  const { address } = useAccount()
-  const [stats, setStats] = useState(() => ({ currentStreak: 0, bestStreak: 0, totalCheckIns: 0, lastCheckInDate: null as string | null }))
-
-  useEffect(()=>{
-    if (!address) return
-    setStats(getStats(address))
-  }, [address])
-
-  const todayDone = useMemo(()=>{
-    if (!stats.lastCheckInDate) return false
-    const now = new Date().toISOString()
-    return isSameUTCDay(stats.lastCheckInDate, now)
-  }, [stats.lastCheckInDate])
+export default function Page() {
+  // mock stats for the visual demo
+  const current = 12, best = 30, total = 74
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <Link href="/checkin" className="btn btn-primary">Quick Check-in</Link>
+    <div className="space-y-12">
+      {/* Header */}
+      <div className="flex flex-col items-center gap-6 text-center">
+        <img src="/logo.png" alt="MisFIT Logo" className="w-24 h-24 md:w-32 md:h-32" />
+        <h1 className="text-4xl md:text-5xl font-bold">MisFIT Check-ins</h1>
+        <p className="text-muted-foreground max-w-2xl">
+          Track your daily check-ins and build unstoppable streaks
+        </p>
+        {/* Place your wallet connect here */}
+        {/* <WalletConnect /> */}
       </div>
 
-      {!address && (
-        <div className="card">
-          <div className="text-sm text-neutral-300">Connect your wallet to see streaks, join challenges, and check-in.</div>
+      {/* Stats */}
+      <section>
+        <h2 className="text-2xl font-semibold mb-6">Your Stats</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatsCard label="Current Streak" value={current} icon="flame" highlight />
+          <StatsCard label="Best Streak" value={best} icon="trophy" />
+          <StatsCard label="Total Check-ins" value={total} icon="calendar" />
         </div>
-      )}
-
-      {address && (
-        <div className="grid sm:grid-cols-3 gap-4">
-          <StatsCard title="Current Streak" value={stats.currentStreak} sub={todayDone? 'You’ve checked in today' : 'No check-in yet today'} />
-          <StatsCard title="Best Streak" value={stats.bestStreak} />
-          <StatsCard title="Total Check-ins" value={stats.totalCheckIns} />
-        </div>
-      )}
-
-      <section className="card">
-        <div className="flex items-center justify-between mb-3">
-          <div className="font-semibold">Progress</div>
-          <div className="text-xs text-neutral-500">Resets 00:00 UTC</div>
-        </div>
-        <ProgressBar current={todayDone ? 1 : 0} total={1} />
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        <div className="card">
-          <div className="font-semibold mb-2">Challenges</div>
-          <p className="text-sm text-neutral-400">Join a seasonal arc to earn badges.</p>
-          <div className="mt-3">
-            <Link href="/challenges" className="btn btn-outline">Open Challenge Hub</Link>
-          </div>
-        </div>
-        <div className="card">
-          <div className="font-semibold mb-2">Trophy Case</div>
-          <p className="text-sm text-neutral-400">Your earned badges will show up here.</p>
-          <div className="mt-3">
-            <Link href="/trophy-case" className="btn btn-outline">View Trophy Case</Link>
-          </div>
+      {/* Progress */}
+      <section className="rounded-2xl bg-card p-8 border border-white/10 shadow-card">
+        <h3 className="text-xl font-semibold mb-2">Progress Towards Badges</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Track your overall streak and challenge milestones
+        </p>
+        <div className="space-y-4">
+          <ProgressBar label="30-Day Streak" current={current} total={30} />
+          <ProgressBar label="Mobility Month" current={12} total={30} colorClass="bg-teal-500" />
         </div>
       </section>
     </div>
