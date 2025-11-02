@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useMemo, useState } from 'react'
-import { RatingSelector } from './RatingSelector'
+import { RatingSelector, type RatingValue } from './RatingSelector'
 import type { CheckinMeta, Lowlight } from '@/lib/types'
 import { saveDraft, loadDraft, clearDraft } from '@/lib/storage'
 
