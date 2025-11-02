@@ -1,0 +1,18 @@
+{
+  "accountAssociation": {
+    "type": "eip4361",
+    "message": "Sign-in with Ethereum to associate your account.",
+    "signature": ""
+  },
+  "miniapp": {
+    "name": "MisFIT Check-ins",
+    "description": "Track daily check-ins and build streaks on Base",
+    "url": "https://misfit-base-miniapp.vercel.app/",
+    "icon": "/favicon.ico",
+    "categories": ["health", "social"],
+    "tags": ["fitness", "web3", "streaks", "challenges"]
+  },
+  "baseBuilder": {
+    "ownerAddress": "0xE9d09765af64cbf7Cff8B48b70554542d33dD33d"
+  }
+}
