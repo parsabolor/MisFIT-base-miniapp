@@ -1,19 +1,36 @@
-'use client'
-import React from 'react'
+"use client"
+import React from "react"
+import { Flame, Trophy, Calendar } from "lucide-react"
+
+type StatIcon = "flame" | "trophy" | "calendar"
+const IconMap = { flame: Flame, trophy: Trophy, calendar: Calendar }
 
 export function StatsCard({
-  title, value, sub, mono = false, icon,
-}: { title: string; value: string | number; sub?: string; mono?: boolean; icon?: React.ReactNode }) {
+  label,
+  value,
+  icon = "flame",
+  highlight,
+  trend, // "up" | "flat" | "down" | undefined
+}: {
+  label: string
+  value: number | string
+  icon?: StatIcon
+  highlight?: boolean
+  trend?: "up" | "flat" | "down"
+}) {
+  const Icon = IconMap[icon]
   return (
-    <div className="card">
-      <div className="flex items-center gap-3">
-        {icon && <div className="text-misfit-red">{icon}</div>}
-        <div>
-          <div className="text-sm text-neutral-400">{title}</div>
-          <div className={mono ? 'text-2xl font-semibold font-mono' : 'text-2xl font-semibold'}>{value}</div>
-          {sub && <div className="text-xs text-neutral-500 mt-1">{sub}</div>}
-        </div>
+    <div className={`rounded-2xl bg-card text-card-foreground border border-white/10 p-8 ${highlight ? "border-accent" : ""} shadow-card`}>
+      <div className="flex items-center justify-between pb-2">
+        <div className="text-sm font-medium">{label}</div>
+        <Icon className="h-4 w-4 text-muted-foreground" />
       </div>
+      <div className="text-4xl font-bold">{value}</div>
+      {trend && (
+        <p className="text-xs text-muted-foreground mt-1">
+          {trend === "up" ? "↑" : trend === "down" ? "↓" : "→"} trend
+        </p>
+      )}
     </div>
   )
 }
