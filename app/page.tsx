@@ -10,7 +10,7 @@ export default function Page() {
   const current = 12, best = 30, total = 74
 
   return (
-    <div className="space-y-12">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 md:py-14 space-y-12">
       {/* Header */}
       <div className="flex flex-col items-center gap-6 text-center">
         <img src="/logo.png" alt="MisFIT Logo" className="w-24 h-24 md:w-32 md:h-32" />
