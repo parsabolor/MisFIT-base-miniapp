@@ -11,7 +11,7 @@ export default function Page() {
     <div className="space-y-12">
       {/* Header */}
       <div className="flex flex-col items-center gap-6 text-center">
-        <img src="/app/logo.png" alt="MisFIT Logo" className="w-24 h-24 md:w-32 md:h-32" />
+        <img src="/logo.png" alt="MisFIT Logo" className="w-24 h-24 md:w-32 md:h-32" />
         <h1 className="text-4xl md:text-5xl font-bold">MisFIT Check-ins</h1>
         <p className="text-muted-foreground max-w-2xl">
           Track your daily check-ins and build unstoppable streaks
