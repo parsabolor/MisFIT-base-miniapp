@@ -3,7 +3,7 @@
     "header": "eyJmaWQiOjE0MzkxNzcsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHgwODVmNzlDZTRmNURDZmQ4MDA1NUZjQjRmMjM2Nzg1NzYzQkFiNjJjIn0",
     "payload": "eyJkb21haW4iOiJtaXNmaXQtYmFzZS1taW5pYXBwLnZlcmNlbC5hcHAifQ",
     "signature": "JqzGw8w0szq7rvGV8RfSpVKqR+/uAg0BO3d33t5zDgUq5vbUgg12m296mkt/hoVJm8C+plan6YYJmEz5QZH87Rw="
-  }
+  },
   "baseBuilder": {
     "ownerAddress": "0xE9d09765af64cbf7Cff8B48b70554542d33dD33d"
   },
