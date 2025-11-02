@@ -7,10 +7,10 @@ import WagmiProviders from '../providers/WagmiProvider'
 export function RootProvider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
   return (
-    <WagmiProvider>
+    <WagmiProviders>
       <QueryClientProvider client={queryClient}>
         {children}
       </QueryClientProvider>
-    </WagmiProvider>
+    </WagmiProviders>
   )
 }
