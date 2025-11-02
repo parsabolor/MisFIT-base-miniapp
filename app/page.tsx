@@ -1,7 +1,9 @@
 'use client'
 export const dynamic = 'force-dynamic'
+
 import { StatsCard } from "@/components/StatsCard"
 import { ProgressBar } from "@/components/ProgressBar"
+import WalletConnect from '@/components/WalletConnect'
 
 export default function Page() {
   // mock stats for the visual demo
@@ -16,8 +18,8 @@ export default function Page() {
         <p className="text-muted-foreground max-w-2xl">
           Track your daily check-ins and build unstoppable streaks
         </p>
-        {/* Place your wallet connect here */}
-        {/* <WalletConnect /> */}
+       
+         <WalletConnect />
       </div>
 
       {/* Stats */}
