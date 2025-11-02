@@ -1,19 +1,34 @@
 {
   "accountAssociation": {
-    "type": "eip4361",
-    "chain": "eip155:8453",
-    "address": "0xE9d09765af64cbf7Cff8B48b70554542d33dD33d",
+    "header": "",
+    "payload": "",
     "signature": ""
-  },
-  "miniapp": {
-    "name": "MisFIT Check-ins",
-    "description": "Track daily check-ins and build streaks on Base",
-    "url": "https://misfit-base-miniapp.vercel.app",
-    "iconUrl": "https://misfit-base-miniapp.vercel.app/favicon.ico",
-    "categories": ["health", "social"],
-    "tags": ["fitness", "web3", "streaks", "challenges"]
   },
   "baseBuilder": {
     "ownerAddress": "0xE9d09765af64cbf7Cff8B48b70554542d33dD33d"
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "MisFIT Check-ins",
+    "homeUrl": "https://misfit-base-miniapp.vercel.app",
+    "iconUrl": "https://misfit-base-miniapp.vercel.app/favicon.ico",
+    "splashImageUrl": "https://misfit-base-miniapp.vercel.app/og-image.png",
+    "splashBackgroundColor": "#000000",
+    "webhookUrl": "https://misfit-base-miniapp.vercel.app/api/webhook",
+    "subtitle": "Show up. Log it. Earn your streak.",
+    "description": "Daily check-ins, streaks, and challenges for the MisFIT community on Base.",
+    "screenshotUrls": [
+      "https://misfit-base-miniapp.vercel.app/screenshots/s1.png",
+      "https://misfit-base-miniapp.vercel.app/screenshots/s2.png",
+      "https://misfit-base-miniapp.vercel.app/screenshots/s3.png"
+    ],
+    "primaryCategory": "health",
+    "tags": ["fitness", "web3", "streaks", "challenges"],
+    "heroImageUrl": "https://misfit-base-miniapp.vercel.app/og-image.png",
+    "tagline": "Prove it. Rep it.",
+    "ogTitle": "MisFIT Check-ins",
+    "ogDescription": "Track daily check-ins and build streaks on Base.",
+    "ogImageUrl": "https://misfit-base-miniapp.vercel.app/og-image.png",
+    "noindex": false
   }
 }
