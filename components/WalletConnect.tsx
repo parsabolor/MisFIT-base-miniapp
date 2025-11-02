@@ -1,50 +1,48 @@
-// components/WalletConnect.tsx
 'use client'
-
-import React from 'react'
-
-// Prefer RainbowKit if available
-let RainbowButton: React.ReactNode | null = null
-try {
-  // @ts-ignore optional dep
-  const { ConnectButton } = require('@rainbow-me/rainbowkit')
-  RainbowButton = <ConnectButton chainStatus="icon" showBalance={false} />
-} catch { /* RainbowKit not installed – fallback to wagmi */ }
 
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 
-// tiny helper to shorten addresses
-const truncate = (a?: string) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
+function truncateMiddle(str: string, start = 6, end = 4) {
+  if (!str) return ''
+  if (str.length <= start + end) return str
+  return `${str.slice(0, start)}…${str.slice(-end)}`
+}
 
-function MinimalWagmiButton() {
-  const { address, isConnected } = useAccount()
-  const { connect, isPending } = useConnect({ connector: injected() })
+export default function WalletConnect() {
+  const { address, isConnected, status } = useAccount()
+  const { connect, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
 
-  if (isConnected) {
+  if (!isConnected) {
     return (
       <button
-        onClick={() => disconnect()}
-        className="rounded-xl px-5 py-3 border border-white/10 bg-white/5 hover:bg-white/10 transition"
+        className="rounded-xl px-6 py-3 font-semibold bg-primary text-primary-foreground hover:opacity-90 transition"
+        onClick={() => connect({ connector: injected() })}
+        disabled={isConnecting}
       >
-        {truncate(address)} · Disconnect
+        {isConnecting ? 'Connecting…' : 'Connect Wallet'}
       </button>
     )
   }
 
   return (
-    <button
-      onClick={() => connect()}
-      disabled={isPending}
-      className="rounded-xl px-6 py-3 bg-primary text-primary-foreground hover:opacity-90 transition"
-    >
-      {isPending ? 'Connecting…' : 'Connect Wallet'}
-    </button>
+    <div className="flex items-center gap-3">
+      <span className="text-sm font-mono text-muted-foreground">
+        {truncateMiddle(address || '')}
+      </span>
+      <span
+        className={`h-2.5 w-2.5 rounded-full ${
+          status === 'connected' ? 'bg-green-500' : 'bg-gray-400'
+        }`}
+        aria-label={status}
+      />
+      <button
+        className="rounded-xl px-4 py-2 text-sm border border-white/10 hover:bg-white/5 transition"
+        onClick={() => disconnect()}
+      >
+        Disconnect
+      </button>
+    </div>
   )
-}
-
-export default function WalletConnect() {
-  // Use RainbowKit if present; otherwise minimal wagmi button
-  return RainbowButton ? <>{RainbowButton}</> : <MinimalWagmiButton />
 }
