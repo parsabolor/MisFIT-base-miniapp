@@ -30,3 +30,4 @@ Connect a wallet (MetaMask/Coinbase/Rainbow), then:
 
 ## Base Mini App
 - `minikit.config.ts` stub included. Wire to MiniKit (@farcaster/frame-sdk) and set webhook secret verification in `/api/webhook`.
+ 
