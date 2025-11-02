@@ -1,31 +1,31 @@
 'use client'
-import React from 'react'
-import { http, createConfig, WagmiProvider } from 'wagmi'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { RainbowKitProvider, getDefaultConfig, darkTheme, lightTheme } from '@rainbow-me/rainbowkit'
-import '@rainbow-me/rainbowkit/styles.css'
-import { base } from '@/lib/chains'
 
-const config = getDefaultConfig({
+import { ReactNode } from 'react'
+import { WagmiProvider as WagmiRoot } from 'wagmi'
+import { RainbowKitProvider, getDefaultConfig, darkTheme } from '@rainbow-me/rainbowkit'
+import { base, baseSepolia } from 'wagmi/chains'
+import { http } from 'viem'
+
+const projectId =
+  process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'MISFIT-DEMO'
+
+export const wagmiConfig = getDefaultConfig({
   appName: 'MisFIT Check-ins',
-  projectId: 'MISFIT-DEMO', // replace with WalletConnect ID in prod
-  chains: [base],
-  transports: { [base.id]: http('https://mainnet.base.org') },
+  projectId,
+  chains: [base, baseSepolia],
+  transports: {
+    [base.id]: http(),         // public RPCs are fine for now
+    [baseSepolia.id]: http(),
+  },
+  ssr: true,
 })
 
-const qc = new QueryClient()
-
-export function AppProviders({ children }: { children: React.ReactNode }) {
+export default function WagmiProviders({ children }: { children: ReactNode }) {
   return (
-    <WagmiProvider config={config as unknown as ReturnType<typeof createConfig>}>
-      <QueryClientProvider client={qc}>
-        <RainbowKitProvider
-          theme={{ lightMode: lightTheme(), darkMode: darkTheme({ accentColor: '#ef4444' }) }}
-          modalSize="compact"
-        >
-          {children}
-        </RainbowKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <WagmiRoot config={wagmiConfig}>
+      <RainbowKitProvider theme={darkTheme()} modalSize="compact">
+        {children}
+      </RainbowKitProvider>
+    </WagmiRoot>
   )
 }
