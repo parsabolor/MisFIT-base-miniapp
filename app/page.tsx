@@ -1,3 +1,5 @@
+'use client'
+export const dynamic = 'force-dynamic'
 import { StatsCard } from "@/components/StatsCard"
 import { ProgressBar } from "@/components/ProgressBar"
 
