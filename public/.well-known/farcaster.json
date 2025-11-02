@@ -22,10 +22,10 @@
       "https://misfit-base-miniapp.vercel.app/screenshots/s2.png",
       "https://misfit-base-miniapp.vercel.app/screenshots/s3.png"
     ],
-    "primaryCategory": "health",
+    "primaryCategory": "health-fitness",
     "tags": ["fitness", "web3", "streaks", "challenges"],
     "heroImageUrl": "https://misfit-base-miniapp.vercel.app/og-image.png",
-    "tagline": "Prove it. Rep it.",
+    "tagline": "Do it. Prove it. Show it.",
     "ogTitle": "MisFIT Check-ins",
     "ogDescription": "Track daily check-ins and build streaks on Base.",
     "ogImageUrl": "https://misfit-base-miniapp.vercel.app/og-image.png",
