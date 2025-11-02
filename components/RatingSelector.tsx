@@ -2,21 +2,23 @@
 import React from "react"
 import clsx from "classnames"
 
-const RATINGS = [
+export type RatingValue = 0 | 1 | 2 | 3 | 4 | 5
+
+const RATINGS: { value: RatingValue; emoji: string; label: string }[] = [
   { value: 0, emoji: "😫", label: "Terrible" },
   { value: 1, emoji: "😕", label: "Bad" },
   { value: 2, emoji: "😐", label: "Okay" },
   { value: 3, emoji: "🙂", label: "Good" },
   { value: 4, emoji: "😊", label: "Great" },
   { value: 5, emoji: "🤩", label: "Amazing" },
-] as const
+]
 
 export function RatingSelector({
   value,
   onChange,
 }: {
-  value: number | null
-  onChange: (v: number) => void
+  value: RatingValue | null
+  onChange: (v: RatingValue) => void
 }) {
   return (
     <div className="flex justify-between gap-2">
