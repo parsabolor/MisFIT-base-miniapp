@@ -1,4 +1,4 @@
-'use client'
+
 import type { Stats, CheckinMeta } from './types'
 
 export const midnightUTC = (): string => {
