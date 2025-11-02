@@ -18,7 +18,9 @@
     "react-dom": "^19.0.0",
     "viem": "^2.9.0",
     "wagmi": "^2.10.0",
-    "zustand": "^4.5.4"
+    "zustand": "^4.5.4",
+    "lucide-react": "^0.451.0",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
