@@ -8,9 +8,7 @@ export function RootProvider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
   return (
     <WagmiProviders>
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </WagmiProviders>
   )
 }
