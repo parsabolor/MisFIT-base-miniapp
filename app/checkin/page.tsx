@@ -1,4 +1,5 @@
 'use client'
+export const dynamic = 'force-dynamic'
 import React, { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { WorkoutDetailsModal } from '@/components/WorkoutDetailsModal'
