@@ -1,18 +1,21 @@
+// components/WalletConnect.tsx
 'use client'
 
 import React from 'react'
 
-/** Try RainbowKit first */
-let RainbowButton: React.ReactNode = null
+// Prefer RainbowKit if available
+let RainbowButton: React.ReactNode | null = null
 try {
-  // @ts-ignore – optional import
+  // @ts-ignore optional dep
   const { ConnectButton } = require('@rainbow-me/rainbowkit')
   RainbowButton = <ConnectButton chainStatus="icon" showBalance={false} />
-} catch {}
+} catch { /* RainbowKit not installed – fallback to wagmi */ }
 
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
-import { truncateMiddle } from './utils' // optional helper if you have one
+
+// tiny helper to shorten addresses
+const truncate = (a?: string) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
 
 function MinimalWagmiButton() {
   const { address, isConnected } = useAccount()
@@ -25,7 +28,7 @@ function MinimalWagmiButton() {
         onClick={() => disconnect()}
         className="rounded-xl px-5 py-3 border border-white/10 bg-white/5 hover:bg-white/10 transition"
       >
-        {address ? `${address.slice(0,6)}…${address.slice(-4)}` : 'Connected'} · Disconnect
+        {truncate(address)} · Disconnect
       </button>
     )
   }
@@ -42,8 +45,6 @@ function MinimalWagmiButton() {
 }
 
 export default function WalletConnect() {
-  // Prefer RainbowKit if available & providers are set up
-  if (RainbowButton) return <>{RainbowButton}</>
-  // Fallback to minimal wagmi button
-  return <MinimalWagmiButton />
+  // Use RainbowKit if present; otherwise minimal wagmi button
+  return RainbowButton ? <>{RainbowButton}</> : <MinimalWagmiButton />
 }
