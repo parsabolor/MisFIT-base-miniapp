@@ -7,7 +7,7 @@ import CheckinClient from './CheckinClient'
 
 export default function Page() {
   return (
-    <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-10 md:py-14 space-y-6">
+    <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-10 md:py-14">
       <CheckinClient />
     </div>
   )
