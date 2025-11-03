@@ -1,15 +1,19 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { StatsCard } from "@/components/StatsCard"
-import { ProgressBar } from "@/components/ProgressBar"
+import Link from 'next/link'
+import { useAccount } from 'wagmi'
+import { StatsCard } from '@/components/StatsCard'
+import { ProgressBar } from '@/components/ProgressBar'
 import WalletConnect from '@/components/WalletConnect'
 
 export default function Page() {
+  const { isConnected } = useAccount()
   const current = 12, best = 30, total = 74
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 md:py-14 space-y-12">
+      {/* Header */}
       <div className="flex flex-col items-center gap-6 text-center">
         <img src="/logo.png" alt="MisFIT Logo" className="w-24 h-24 md:w-32 md:h-32" />
         <h1 className="text-4xl md:text-5xl font-bold">MisFIT Check-ins</h1>
@@ -17,8 +21,22 @@ export default function Page() {
           Track your daily check-ins and build unstoppable streaks
         </p>
         <WalletConnect />
+
+        {/* CTA */}
+        {isConnected ? (
+          <Link
+            href="/checkin"
+            className="mt-2 inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold
+                       bg-primary text-primary-foreground hover:opacity-90 transition"
+          >
+            Check in for Today
+          </Link>
+        ) : (
+          <div className="text-sm text-muted-foreground">Connect your wallet to check in.</div>
+        )}
       </div>
 
+      {/* Stats */}
       <section>
         <h2 className="text-2xl font-semibold mb-6">Your Stats</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -28,6 +46,7 @@ export default function Page() {
         </div>
       </section>
 
+      {/* Progress */}
       <section className="rounded-2xl bg-card p-8 border border-white/10 shadow-card">
         <h3 className="text-xl font-semibold mb-2">Progress Towards Badges</h3>
         <p className="text-sm text-muted-foreground mb-4">
