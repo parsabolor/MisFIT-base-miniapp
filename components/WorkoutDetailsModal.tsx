@@ -1,10 +1,24 @@
 'use client'
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { RatingSelector } from './RatingSelector'
 import type { CheckinMeta, Lowlight } from '@/lib/types'
 import { saveDraft, loadDraft, clearDraft } from '@/lib/storage'
 
 const DEFAULT_CHIPS = ['Felt tired', 'No motivation', 'Injury', 'Too busy']
+
+function formatToday() {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(new Date())
+  } catch {
+    // very safe fallback
+    return new Date().toDateString()
+  }
+}
 
 export function WorkoutDetailsModal({
   address,
@@ -19,6 +33,9 @@ export function WorkoutDetailsModal({
   const [rating, setRating] = useState<0 | 1 | 2 | 3 | 4 | 5>(3)
   const [lowlight, setLowlight] = useState<Lowlight | undefined>(undefined)
   const [saving, setSaving] = useState(false)
+
+  // Static “today” string (doesn’t need to reformat on re-render)
+  const todayLabel = useMemo(() => formatToday(), [])
 
   // draft autosave
   useEffect(() => {
@@ -61,6 +78,12 @@ export function WorkoutDetailsModal({
         <div>
           <h1 className="text-2xl font-semibold">Daily Check-in</h1>
           <p className="text-sm text-muted-foreground">Step {step} of {totalSteps}</p>
+        </div>
+
+        {/* Today badge (read-only) */}
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs text-neutral-300">
+          <span role="img" aria-label="calendar">📅</span>
+          <span>{todayLabel}</span>
         </div>
       </div>
 
@@ -169,6 +192,7 @@ export function WorkoutDetailsModal({
         <div className="mt-6 space-y-5 rounded-xl border border-white/10 bg-black/20 p-4">
           <div className="text-sm text-neutral-400">Review</div>
           <div className="space-y-1 text-sm">
+            <div><span className="text-neutral-500">Date:</span> {todayLabel}</div>
             <div><span className="text-neutral-500">Title:</span> {title || '—'}</div>
             <div><span className="text-neutral-500">Description:</span> {description || '—'}</div>
             <div><span className="text-neutral-500">Rating:</span> {rating}</div>
