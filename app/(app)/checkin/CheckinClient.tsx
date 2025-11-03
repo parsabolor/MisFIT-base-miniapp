@@ -10,19 +10,19 @@ import { SuccessSheet } from '@/components/SuccessSheet'
 export default function CheckinClient() {
   const { address } = useAccount()
 
-  // Controlled modal state
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false)          // controls showing the modal card
+  const [successOpen, setSuccessOpen] = useState(false)
   const [summary, setSummary] = useState<React.ReactNode>(null)
 
   const onStart = () => setOpen(true)
 
-  const submit = async (payload: Omit<CheckinMeta,'version'|'userId'|'checkinAt'>) => {
+  const submit = async (payload: Omit<CheckinMeta, 'version'|'userId'|'checkinAt'>) => {
     if (!address) return
     const now = new Date().toISOString()
     const meta: CheckinMeta = { version: 'misfit-checkin-1', userId: address, checkinAt: now, ...payload }
     addCheckin(address, meta)
 
-    // update streak stats (local storage mock)
+    // streak math (local storage mock)
     const s = getStats(address)
     const last = s.lastCheckInDate ? new Date(s.lastCheckInDate) : null
     const lastDay = last ? Date.UTC(last.getUTCFullYear(), last.getUTCMonth(), last.getUTCDate()) : null
@@ -46,29 +46,21 @@ export default function CheckinClient() {
         <div className="text-sm text-neutral-300">
           Streak: <b>{s.currentStreak}</b> (best {s.bestStreak})
         </div>
-        <div className="text-sm">
-          <span className="text-neutral-400">Title:</span> {meta.title || '—'}
-        </div>
-        <div className="text-sm">
-          <span className="text-neutral-400">Rating:</span> {meta.rating}
-        </div>
+        <div className="text-sm"><span className="text-neutral-400">Title:</span> {meta.title || '—'}</div>
+        <div className="text-sm"><span className="text-neutral-400">Rating:</span> {meta.rating}</div>
         {meta.lowlight && (
           <div className="text-sm">
             <span className="text-neutral-400">Lowlight:</span>{' '}
-            {(meta.lowlight.chips || []).join(', ') || '—'}{' '}
-            {meta.lowlight.coachFlag ? '(coach reach-out)' : ''}
+            {(meta.lowlight.chips || []).join(', ') || '—'} {meta.lowlight.coachFlag ? '(coach reach-out)' : ''}
           </div>
         )}
       </div>
     )
 
-    // close modal, show success
+    // close the modal card and show success
     setOpen(false)
-    // SuccessSheet is controlled by its own "open" prop—open it right after closing the modal
-    setTimeout(() => setSuccessOpen(true), 0)
+    setSuccessOpen(true)
   }
-
-  const [successOpen, setSuccessOpen] = useState(false)
 
   if (!address) return <div className="card">Connect your wallet to check-in.</div>
 
@@ -76,18 +68,16 @@ export default function CheckinClient() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Daily Check-in</h1>
-        <button className="btn btn-primary" onClick={onStart}>
-          Start Check-in
-        </button>
+        <button className="btn btn-primary" onClick={onStart}>Start Check-in</button>
       </div>
 
-      {/* Controlled Modal */}
-      <WorkoutDetailsModal
-        address={address}
-        open={open}
-        onOpenChange={setOpen}
-        onSubmit={submit}
-      />
+      {/* Only render the modal card when user clicks CTA */}
+      {open && (
+        <WorkoutDetailsModal
+          address={address}
+          onSubmit={submit}
+        />
+      )}
 
       <SuccessSheet
         open={successOpen}
