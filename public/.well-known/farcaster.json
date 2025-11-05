@@ -15,7 +15,7 @@
     "splashImageUrl": "https://misfit-base-miniapp.vercel.app/og-image.png",
     "splashBackgroundColor": "#000000",
     "webhookUrl": "https://misfit-base-miniapp.vercel.app/api/webhook",
-    "subtitle": "Show up. Log it. Earn your streak.",
+    "subtitle": "Show up. Earn your streak.",
     "description": "Daily check-ins, streaks, and challenges for the MisFIT community on Base.",
     "screenshotUrls": [
       "https://misfit-base-miniapp.vercel.app/screenshots/s1.png",
