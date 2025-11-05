@@ -1,9 +1,13 @@
-// components/SiteTabs.tsx
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { cn } from '@/lib/cn' // or your classnames helper
 
+// --- simple className combiner (inline) ---
+function cn(...inputs: (string | undefined | null | false)[]) {
+  return inputs.filter(Boolean).join(' ')
+}
+
+// --- types & data ---
 type Tab = { label: string; href: string }
 
 const TABS: Tab[] = [
@@ -13,13 +17,14 @@ const TABS: Tab[] = [
   { label: 'Trophy Case', href: '/trophy' }, // keep for later
 ]
 
-// Accept plain string, cast once to satisfy typedRoutes.
+// --- link wrapper to satisfy typedRoutes ---
 function NavLink(props: React.ComponentProps<'a'> & { href: string }) {
   const { href, ...rest } = props
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return <Link href={href as any} {...rest} />
 }
 
+// --- main component ---
 export default function SiteTabs() {
   const pathname = usePathname()
 
@@ -34,6 +39,7 @@ export default function SiteTabs() {
             const active =
               pathname === t.href ||
               (t.href !== '/' && pathname?.startsWith(t.href))
+
             return (
               <NavLink
                 key={t.href}
