@@ -5,39 +5,9 @@
 /* Fonts (Inter + JetBrains Mono via <link> or next/font) */
 
 /* ---------- Semantic Color Tokens ---------- */
+/* Base = Dark mode first */
 :root {
-  /* Light mode (from spec) */
-  --background: 0 0% 94.12%;
-  --foreground: 0 0% 10.2%;
-
-  --card: 0 0% 98.82%;
-  --card-foreground: 0 0% 10.2%;
-
-  --popover: 0 0% 98.82%;
-  --popover-foreground: 0 0% 10.2%;
-
-  --border: 0 0% 90.98%;
-  --input: 0 0% 90.98%;
-  --ring: 0 0% 10.2%;
-
-  --muted: 0 0% 89%;
-  --muted-foreground: 0 0% 60%;
-
-  --primary: 0 85% 55%;           /* #F2362E / brand red (light) */
-  --primary-foreground: 0 0% 100%;
-
-  --accent: 0 85% 55%;            /* same as primary for simplicity */
-  --accent-foreground: 0 0% 100%;
-
-  --secondary: 0 0% 77%;
-  --secondary-foreground: 0 0% 10%;
-
-  --destructive: 0 72% 55%;
-  --destructive-foreground: 0 0% 98%;
-}
-
-.dark {
-  /* Dark mode (primary) from spec */
+  /* Dark mode (primary theme) */
   --background: 20 14% 4%;
   --foreground: 45 25% 91%;
 
@@ -54,7 +24,7 @@
   --muted: 222 15% 20%;
   --muted-foreground: 0 0% 60%;
 
-  --primary: 0 85% 60%;           /* #F54538 / brand red (dark) */
+  --primary: 0 85% 60%;           /* #F54538 / brand red */
   --primary-foreground: 0 0% 100%;
 
   --accent: 0 85% 60%;
@@ -67,15 +37,137 @@
   --destructive-foreground: 0 0% 100%;
 }
 
-/* Challenge themes */
-.mobility-theme { --accent: 174 62% 40%; }  /* teal-ish */
+/* Light mode override */
+.light {
+  --background: 0 0% 94.12%;
+  --foreground: 0 0% 10.2%;
+
+  --card: 0 0% 98.82%;
+  --card-foreground: 0 0% 10.2%;
+
+  --popover: 0 0% 98.82%;
+  --popover-foreground: 0 0% 10.2%;
+
+  --border: 0 0% 90.98%;
+  --input: 0 0% 90.98%;
+  --ring: 0 0% 10.2%;
+
+  --muted: 0 0% 89%;
+  --muted-foreground: 0 0% 50%;
+
+  --primary: 0 85% 55%;
+  --primary-foreground: 0 0% 100%;
+
+  --accent: 0 85% 55%;
+  --accent-foreground: 0 0% 100%;
+
+  --secondary: 0 0% 77%;
+  --secondary-foreground: 0 0% 10%;
+
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 0 0% 98%;
+}
+
+/* ---------- Challenge Themes ---------- */
+.mobility-theme { --accent: 174 62% 40%; }  /* teal */
 .strength-theme { --accent: 28 90% 55%; }   /* orange */
 
-/* Elevation overlays */
-.hover-elevate:hover { box-shadow: 0 0 0 9999px rgba(255,255,255,0.04) inset; }
-.active-elevate-2:active { box-shadow: 0 0 0 9999px rgba(255,255,255,0.09) inset; }
+/* ---------- Utility Helpers ---------- */
+.bg-background { background-color: hsl(var(--background)); }
+.text-foreground { color: hsl(var(--foreground)); }
+.bg-card { background-color: hsl(var(--card)); }
+.border-default { border-color: hsl(var(--border)); }
+.text-muted-foreground { color: hsl(var(--muted-foreground)); }
+.bg-primary { background-color: hsl(var(--primary)); }
+.text-primary-foreground { color: hsl(var(--primary-foreground)); }
+
+/* ---------- Inputs & Textareas ---------- */
+.input,
+.textarea {
+  width: 100%;
+  border-radius: 0.75rem;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--input));
+  padding: 0.65rem 0.8rem;
+  line-height: 1.45;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
+.input:hover,
+.textarea:hover {
+  border-color: hsl(var(--border));
+}
+
+.input:focus,
+.textarea:focus {
+  outline: none;
+  border-color: transparent;
+  box-shadow: 0 0 0 3px hsla(var(--ring) / 0.25);
+}
+
+.textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  padding: 0.6rem 1.2rem;
+}
+
+.btn-primary {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-outline {
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+  background: transparent;
+}
+
+.btn-outline:hover {
+  background-color: hsla(var(--foreground) / 0.06);
+}
+
+/* ---------- Cards / Panels ---------- */
+.panel {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 4px hsla(var(--foreground) / 0.05);
+}
+
+/* ---------- Misc ---------- */
+.hover-elevate:hover {
+  box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.04) inset;
+}
+
+.active-elevate-2:active {
+  box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.09) inset;
+}
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
