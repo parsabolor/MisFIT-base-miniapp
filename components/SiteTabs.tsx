@@ -15,6 +15,7 @@ const TABS: Tab[] = [
   { label: 'Leaderboard', href: '/leaderboard' },
   { label: 'Challenges',  href: '/challenges' },
   { label: 'Trophy Case', href: '/trophy' }, // keep for later
+  { label: 'Settings',    href: '/settings' },
 ]
 
 // --- link wrapper to satisfy typedRoutes ---
