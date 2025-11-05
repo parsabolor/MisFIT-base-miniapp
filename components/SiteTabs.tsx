@@ -14,7 +14,7 @@ const TABS: Tab[] = [
   { label: 'Dashboard',   href: '/' },
   { label: 'Leaderboard', href: '/leaderboard' },
   { label: 'Challenges',  href: '/challenges' },
-  { label: 'Trophy Case', href: '/trophy' }, // keep for later
+  { label: 'Trophy Case', href: '/trophy-case' }, // keep for later
   { label: 'Settings',    href: '/settings' },
 ]
 
