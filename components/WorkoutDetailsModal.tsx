@@ -4,243 +4,269 @@ import React, { useEffect, useMemo, useState } from 'react'
 import type { CheckinMeta, Lowlight } from '@/lib/types'
 import { saveDraft, loadDraft, clearDraft } from '@/lib/storage'
 
-const DEFAULT_CHIPS = ['Felt tired','No motivation','Injury','Too busy']
-const fmtDate = () =>
-  new Intl.DateTimeFormat(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}).format(new Date())
+// ------- helpers -------
+const DEFAULT_CHIPS = ['Felt tired', 'No motivation', 'Injury', 'Too busy']
 
-type Step = 1|2|3|4 // 4 = review
+function formatToday() {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(new Date())
+  } catch {
+    return new Date().toDateString()
+  }
+}
+
+// A tiny, self-contained rating row to avoid any mismatch with a custom RatingSelector
+function RatingRow({
+  value,
+  onChange,
+}: {
+  value: number | null
+  onChange: (v: number) => void
+}) {
+  const items = [
+    { v: 1, label: 'Awful', emoji: '😵‍💫' },
+    { v: 2, label: 'Tough', emoji: '😣' },
+    { v: 3, label: 'Okay', emoji: '😐' },
+    { v: 4, label: 'Good', emoji: '😊' },
+    { v: 5, label: 'Great', emoji: '🔥' },
+  ]
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      {items.map((it) => {
+        const active = value === it.v
+        return (
+          <button
+            key={it.v}
+            type="button"
+            onClick={() => onChange(it.v)}
+            className={[
+              'w-full rounded-xl border px-3 py-3 text-left',
+              'transition focus:outline-none focus:ring-2 focus:ring-white/20',
+              active
+                ? 'border-white/30 bg-white/10'
+                : 'border-white/10 hover:border-white/20',
+            ].join(' ')}
+          >
+            <div className="text-2xl">{it.emoji}</div>
+            <div className="mt-1 text-sm text-neutral-300">{it.label}</div>
+            <div className="text-xs text-neutral-500">{it.v}</div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 export function WorkoutDetailsModal({
   address,
   onSubmit,
-  open,
-  setOpen,
 }: {
   address: string
-  onSubmit: (meta: Omit<CheckinMeta,'version'|'userId'|'checkinAt'>) => Promise<void>
-  open: boolean
-  setOpen: (v: boolean) => void
+  onSubmit: (meta: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) => Promise<void>
 }) {
-  const [step, setStep] = useState<Step>(1)
+  // Steps: 1=details, 2=rating, 3=rough (only if rating<=1), 4=review
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [rating, setRating] = useState<0|1|2|3|4|5>(0)
+  const [rating, setRating] = useState<number | null>(null)
   const [lowlight, setLowlight] = useState<Lowlight | undefined>(undefined)
   const [saving, setSaving] = useState(false)
 
-  const today = useMemo(fmtDate, [])
-  const showRough = rating === 1
+  const todayLabel = useMemo(() => formatToday(), [])
 
-  // draft autosave/load
+  // figure total steps dynamically
+  const showRough = rating !== null && rating <= 1
+  const totalSteps = showRough ? 4 : 3
+  const pct = useMemo(() => (step / totalSteps) * 100, [step, totalSteps])
+
+  // draft autosave
   useEffect(() => {
-    if (!open) return
-    const d = loadDraft(address)
-    if (d) {
-      if (typeof d.title === 'string') setTitle(d.title)
-      if (typeof d.description === 'string') setDescription(d.description)
-      if (typeof d.rating === 'number') setRating(d.rating as any)
-      if (d.lowlight) setLowlight(d.lowlight as any)
-    }
-    const id = setInterval(() => saveDraft(address, { title, description, rating, lowlight }), 1500)
+    const id = setInterval(() => {
+      saveDraft(address, { title, description, rating, lowlight })
+    }, 1500)
     return () => clearInterval(id)
-  }, [open, address, title, description, rating, lowlight])
+  }, [address, title, description, rating, lowlight])
 
-  const reset = () => { setStep(1); setTitle(''); setDescription(''); setRating(0); setLowlight(undefined) }
+  // load draft
+  useEffect(() => {
+    const d = loadDraft(address)
+    if (!d) return
+    if (typeof d.title === 'string') setTitle(d.title)
+    if (typeof d.description === 'string') setDescription(d.description)
+    if (typeof d.rating === 'number' || d.rating === null) setRating(d.rating)
+    if (d.lowlight) setLowlight(d.lowlight as any)
+  }, [address])
 
-  const handlePrimary = async () => {
-    if (step === 1) return setStep(2)
-    if (step === 2) return setStep(showRough ? 3 : 4)
-    if (step === 3) return setStep(4)
-    if (step === 4) {
-      setSaving(true)
-      await onSubmit({ title: title || undefined, description: description || undefined, rating, lowlight })
-      clearDraft(address)
-      setSaving(false)
-      setOpen(false)
-      reset()
+  const goFromRating = () => {
+    // If no rating chosen, skip to review
+    if (rating === null) {
+      setStep(4)
+      return
     }
+    // If rating is 1 or less -> rough step; else -> review
+    setStep(rating <= 1 ? 3 : 4)
   }
 
-  const primaryLabel =
-    step === 1 ? 'Continue' :
-    step === 2 ? 'Continue' :
-    step === 3 ? 'Review' :
-    saving ? 'Saving…' : 'Submit'
-
-  const canContinue =
-    step === 1 ? true :
-    step === 2 ? rating > 0 :
-    step === 3 ? true : !saving
+  const handleSubmit = async () => {
+    setSaving(true)
+    await onSubmit({
+      title: title || undefined,
+      description: description || undefined,
+      rating: (rating ?? 0) as 0 | 1 | 2 | 3 | 4 | 5, // keep your existing type expectation
+      lowlight,
+    })
+    clearDraft(address)
+    setSaving(false)
+  }
 
   return (
-    <>
+    <div className="rounded-2xl border border-white/10 bg-card/60 backdrop-blur p-6 md:p-8 shadow-card">
+      {/* Header */}
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Daily Check-in</h1>
+          <p className="text-sm text-muted-foreground">Step {step} of {totalSteps}</p>
+        </div>
 
-      {open && (
-        <div className="fixed inset-0 z-50">
-          {/* backdrop */}
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)} />
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs text-neutral-300">
+          <span role="img" aria-label="calendar">📅</span>
+          <span>{todayLabel}</span>
+        </div>
+      </div>
 
-          {/* panel */}
-          <div className="absolute inset-0 grid place-items-center p-4">
-            <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#0c0c0c] p-6 shadow-2xl">
-              {/* header */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <div className="text-lg font-semibold">
-                    {step===1 && 'Add workout details (optional)'}
-                    {step===2 && 'How did it feel?'}
-                    {step===3 && 'Rough day — anything specific?'}
-                    {step===4 && 'Review'}
-                  </div>
-                  <div className="text-sm text-neutral-400">
-                    {step===1 && 'Share details about your workout'}
-                    {step===2 && 'Rate your overall experience'}
-                    {step===3 && 'Pick any that apply (optional)'}
-                    {step===4 && 'Confirm and submit'}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-neutral-300">
-                    {today}
-                  </span>
-                  <button
-                    onClick={() => setOpen(false)}
-                    className="rounded-md p-2 text-neutral-400 hover:text-neutral-200 hover:bg-white/5"
-                    aria-label="Close"
-                  >✕</button>
-                </div>
-              </div>
+      {/* Stepper */}
+      <div className="mb-6 h-2 w-full rounded-full bg-white/10">
+        <div className="h-full rounded-full bg-white/30" style={{ width: `${pct}%` }} />
+      </div>
 
-              {/* content */}
-              <div className="mt-6 space-y-4">
-                {step===1 && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="mb-2 block text-sm text-neutral-300">What did you do?</label>
-                      <input
-                        className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none placeholder:text-neutral-500 focus:border-white/20"
-                        placeholder="e.g., Mobility W1D3 — Hip Flow"
-                        value={title}
-                        onChange={(e)=>setTitle(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-sm text-neutral-300">Description</label>
-                      <textarea
-                        rows={4}
-                        className="w-full resize-none rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none placeholder:text-neutral-500 focus:border-white/20"
-                        placeholder="Deep dive, cues, how it felt…"
-                        value={description}
-                        onChange={(e)=>setDescription(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
+      {/* STEP 1: details */}
+      {step === 1 && (
+        <div className="space-y-5">
+          <label className="block">
+            <span className="mb-1 block text-sm text-neutral-300">What did you do?</span>
+            <input
+              className="input w-full"
+              placeholder="e.g., Mobility W1D3 — Hip Flow"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </label>
 
-                {step===2 && (
-                  <div className="space-y-3">
-                    <div className="text-sm text-neutral-300">How did it feel overall?</div>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                      {[
-                        {v:1,label:'Awful',emoji:'😵‍💫'},
-                        {v:2,label:'Tough',emoji:'😖'},
-                        {v:3,label:'Okay',emoji:'🙂'},
-                        {v:4,label:'Good',emoji:'😊'},
-                        {v:5,label:'Great',emoji:'🔥'},
-                      ].map(({v,label,emoji})=>{
-                        const active = rating === v
-                        return (
-                          <button
-                            key={v}
-                            onClick={()=>setRating(v as any)}
-                            className={`flex h-24 flex-col items-center justify-center rounded-xl border text-sm transition
-                              ${active ? 'border-rose-500 bg-rose-500/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}
-                          >
-                            <div className="text-2xl">{emoji}</div>
-                            <div className="mt-1 font-medium">{label}</div>
-                            <div className="text-xs text-neutral-400">{v}</div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <div className="text-xs text-neutral-500">
-                      Select a rating to continue, or skip to proceed without rating.
-                    </div>
-                  </div>
-                )}
+          <label className="block">
+            <span className="mb-1 block text-sm text-neutral-300">Description</span>
+            <textarea
+              className="textarea w-full min-h-28"
+              placeholder="Deep dive, cues, how it felt…"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </label>
 
-                {step===3 && (
-                  <div className="space-y-4">
-                    <div className="text-sm text-neutral-300">Pick any that apply</div>
-                    <div className="flex flex-wrap gap-2">
-                      {DEFAULT_CHIPS.map((c)=>{
-                        const active = lowlight?.chips?.includes(c) ?? false
-                        return (
-                          <button
-                            key={c}
-                            onClick={()=>{
-                              const chips = new Set(lowlight?.chips || [])
-                              active ? chips.delete(c) : chips.add(c)
-                              setLowlight({ coachFlag: lowlight?.coachFlag ?? false, chips: Array.from(chips) })
-                            }}
-                            className={`rounded-full border px-3 py-1 text-sm
-                              ${active ? 'border-rose-500 text-rose-400 bg-rose-500/10' : 'border-white/10 text-neutral-300 hover:bg-white/5'}`}
-                          >
-                            {c}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <label className="flex items-center gap-2 text-sm text-neutral-300">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-white/20 bg-black/40"
-                        checked={lowlight?.coachFlag ?? false}
-                        onChange={(e)=>setLowlight({ chips: lowlight?.chips || [], coachFlag: e.target.checked })}
-                      />
-                      Would like coach to reach out
-                    </label>
-                  </div>
-                )}
-
-                {step===4 && (
-                  <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-4 text-sm">
-                    <div className="text-neutral-400">Review</div>
-                    <div><span className="text-neutral-500">Date:</span> {today}</div>
-                    <div><span className="text-neutral-500">Title:</span> {title || '—'}</div>
-                    <div><span className="text-neutral-500">Description:</span> {description || '—'}</div>
-                    <div><span className="text-neutral-500">Rating:</span> {rating || '—'}</div>
-                    {showRough && (
-                      <div>
-                        <span className="text-neutral-500">Lowlight:</span>{' '}
-                        {(lowlight?.chips || []).join(', ') || '—'} {lowlight?.coachFlag ? '(coach reach-out)' : ''}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* footer */}
-              <div className="mt-6 flex items-center justify-between">
-                <button
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-neutral-200 hover:bg-white/5"
-                  onClick={() => setStep(prev => (prev === 1 ? 1 : (prev - 1) as Step))}
-                >
-                  ← Back
-                </button>
-                <button
-                  disabled={!canContinue}
-                  onClick={handlePrimary}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white
-                    ${canContinue ? 'bg-rose-600 hover:bg-rose-500' : 'bg-rose-900/40 cursor-not-allowed'}`}
-                >
-                  {primaryLabel} →
-                </button>
-              </div>
-            </div>
+          <div className="flex justify-end">
+            <button className="btn btn-primary" onClick={() => setStep(2)}>
+              Continue →
+            </button>
           </div>
         </div>
       )}
-    </>
+
+      {/* STEP 2: rating */}
+      {step === 2 && (
+        <div className="space-y-5">
+          <div>
+            <div className="mb-1 text-base font-medium">How did it feel?</div>
+            <div className="mb-3 text-sm text-neutral-400">Rate your overall experience</div>
+            <RatingRow value={rating} onChange={setRating} />
+            <div className="mt-2 text-xs text-neutral-500">
+              {rating === null ? 'You can skip rating and continue.' : 'You can change this before submitting.'}
+            </div>
+          </div>
+
+          <div className="flex justify-between">
+            <button className="btn btn-outline" onClick={() => setStep(1)}>Back</button>
+            <button className="btn btn-primary" onClick={goFromRating}>
+              {rating === null ? 'Skip →' : 'Continue →'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3: rough-day extras */}
+      {step === 3 && (
+        <div className="space-y-5">
+          <div>
+            <div className="mb-2 text-sm text-neutral-300">Rough day — anything specific?</div>
+            <div className="flex flex-wrap gap-2">
+              {DEFAULT_CHIPS.map((c) => {
+                const active = lowlight?.chips?.includes(c) ?? false
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`badge ${active ? 'border-misfit-red text-misfit-red' : ''}`}
+                    onClick={() => {
+                      const chips = new Set(lowlight?.chips || [])
+                      active ? chips.delete(c) : chips.add(c)
+                      setLowlight({ coachFlag: lowlight?.coachFlag ?? false, chips: Array.from(chips) })
+                    }}
+                  >
+                    {c}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={lowlight?.coachFlag ?? false}
+              onChange={(e) =>
+                setLowlight({ chips: lowlight?.chips || [], coachFlag: e.target.checked })
+              }
+            />
+            Would like coach to reach out
+          </label>
+
+          <div className="flex justify-between">
+            <button className="btn btn-outline" onClick={() => setStep(2)}>Back</button>
+            <button className="btn btn-primary" onClick={() => setStep(4)}>Continue →</button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 4: review */}
+      {step === 4 && (
+        <div className="space-y-5">
+          <div className="text-sm text-neutral-400">Review</div>
+          <div className="space-y-1 text-sm">
+            <div><span className="text-neutral-500">Date:</span> {todayLabel}</div>
+            <div><span className="text-neutral-500">Title:</span> {title || '—'}</div>
+            <div><span className="text-neutral-500">Description:</span> {description || '—'}</div>
+            <div><span className="text-neutral-500">Rating:</span> {rating ?? '—'}</div>
+            {showRough && (
+              <div>
+                <span className="text-neutral-500">Lowlight:</span>{' '}
+                {(lowlight?.chips || []).join(', ') || '—'} {lowlight?.coachFlag ? '(coach reach-out)' : ''}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-between">
+            <button className="btn btn-outline" onClick={() => setStep(showRough ? 3 : 2)}>Back</button>
+            <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
+              {saving ? 'Saving…' : 'Submit'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
