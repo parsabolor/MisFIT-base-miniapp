@@ -36,8 +36,20 @@ function clsx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(' ')
 }
 
+// Local profile: { pseudonym?: string }
+function readLocalPseudonym(forAddress: `0x${string}` | undefined) {
+  if (!forAddress) return ''
+  try {
+    const raw = localStorage.getItem(`misfit-profile-${forAddress}`)
+    if (!raw) return ''
+    const obj = JSON.parse(raw)
+    return typeof obj?.pseudonym === 'string' ? obj.pseudonym : ''
+  } catch {
+    return ''
+  }
+}
+
 // Derive a single local row from localStorage-based stats (so the page is never empty)
-// You already have local storage helpers; we read directly to avoid coupling.
 function readLocalUserRow(address: `0x${string}` | undefined): Row[] {
   if (!address) return []
   try {
@@ -47,11 +59,12 @@ function readLocalUserRow(address: `0x${string}` | undefined): Row[] {
     const best = Number(stats?.bestStreak || 0)
     const total = Number(stats?.totalCheckIns || 0)
     const last = stats?.lastCheckInDate || null
+    const pseudo = readLocalPseudonym(address)
     return [
       {
         rank: 1,
         address,
-        username: null,
+        username: pseudo || null,
         currentStreak: current,
         bestStreak: best,
         totalCheckIns: total,
@@ -76,13 +89,13 @@ export default function LeaderboardClient() {
 
     async function load() {
       setError(null)
-      // Try remote API
       try {
         const res = await fetch('/api/leaderboard?limit=100', { cache: 'no-store' })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data: ApiResp = await res.json()
 
-        const normalized: Row[] = data.items
+        // Normalize + sort
+        let normalized: Row[] = data.items
           .map((it) => ({
             address: it.address,
             username: it.username ?? null,
@@ -92,17 +105,30 @@ export default function LeaderboardClient() {
             lastCheckInAt: it.lastCheckInAt ?? null,
           }))
           .sort((a, b) => {
-            // Sort by bestStreak desc, then currentStreak desc, then total desc
             if (b.bestStreak !== a.bestStreak) return b.bestStreak - a.bestStreak
             if (b.currentStreak !== a.currentStreak) return b.currentStreak - a.currentStreak
             return b.totalCheckIns - a.totalCheckIns
           })
           .map((r, i) => ({ ...r, rank: i + 1 }))
 
+        // Apply local pseudonyms where available.
+        // 1) Always apply *your* local pseudonym to your row (overrides missing username).
+        // 2) For other rows, use their API username if present; otherwise try local pseudonym (usually absent).
+        const yourAddr = address as `0x${string}` | undefined
+        const yourPseudo = readLocalPseudonym(yourAddr)
+
+        normalized = normalized.map((r) => {
+          const isYou = yourAddr && r.address.toLowerCase() === yourAddr.toLowerCase()
+          if (isYou && yourPseudo) return { ...r, username: yourPseudo }
+          // Optional: attempt local pseudonym lookup for others too (will typically be empty)
+          const localForRow = readLocalPseudonym(r.address)
+          if (!r.username && localForRow) return { ...r, username: localForRow }
+          return r
+        })
+
         if (!cancelled) setRows(normalized)
         return
       } catch (e) {
-        // Swallow and fallback to local
         if (!cancelled) {
           const fallback = readLocalUserRow(address as `0x${string}` | undefined)
           setRows(fallback.length ? fallback : [])
@@ -142,7 +168,7 @@ export default function LeaderboardClient() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search address or username"
+            placeholder="Search pseudonym or address"
             className="input w-64"
           />
         </div>
@@ -164,7 +190,6 @@ export default function LeaderboardClient() {
 
       {/* Table / Skeleton / Empty */}
       {filtered === null ? (
-        // skeleton
         <div className="rounded-2xl border border-white/10 bg-card/60 p-6 shadow-card">
           <div className="animate-pulse space-y-3">
             <div className="h-6 w-1/3 rounded bg-white/10" />
@@ -196,7 +221,9 @@ export default function LeaderboardClient() {
               </thead>
               <tbody>
                 {filtered.map((r) => {
-                  const isYou = address && r.address?.toLowerCase() === address.toLowerCase()
+                  const isYou =
+                    address && r.address?.toLowerCase() === address.toLowerCase()
+                  const display = r.username || truncateMiddle(r.address, 6, 4)
                   return (
                     <tr
                       key={r.rank + r.address}
@@ -226,10 +253,12 @@ export default function LeaderboardClient() {
                           <div className="h-7 w-7 shrink-0 rounded-full bg-white/10" />
                           <div className="flex flex-col">
                             <span className="text-sm">
-                              {r.username || truncateMiddle(r.address, 6, 4)}
+                              {display}
                               {isYou && <span className="ml-2 text-xs text-primary">(you)</span>}
                             </span>
-                            <span className="text-xs text-neutral-500">{truncateMiddle(r.address, 8, 6)}</span>
+                            <span className="text-xs text-neutral-500">
+                              {truncateMiddle(r.address, 8, 6)}
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -248,7 +277,6 @@ export default function LeaderboardClient() {
             </table>
           </div>
 
-          {/* footer hint */}
           <div className="border-t border-white/10 px-4 py-3 text-right text-xs text-neutral-500">
             Sorted by Best Streak → Current Streak → Total Check-ins
           </div>
