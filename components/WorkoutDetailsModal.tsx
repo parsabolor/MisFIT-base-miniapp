@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import type { CheckinMeta, Lowlight } from '@/lib/types'
 import { saveDraft, loadDraft, clearDraft } from '@/lib/storage'
 
-// ------- helpers -------
+// --- constants / helpers ---
 const DEFAULT_CHIPS = ['Felt tired', 'No motivation', 'Injury', 'Too busy']
 
 function formatToday() {
@@ -20,7 +20,8 @@ function formatToday() {
   }
 }
 
-// A tiny, self-contained rating row to avoid any mismatch with a custom RatingSelector
+type RatingUnion = 0 | 1 | 2 | 3 | 4 | 5
+
 function RatingRow({
   value,
   onChange,
@@ -34,7 +35,7 @@ function RatingRow({
     { v: 3, label: 'Okay', emoji: '😐' },
     { v: 4, label: 'Good', emoji: '😊' },
     { v: 5, label: 'Great', emoji: '🔥' },
-  ]
+  ] as const
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -44,12 +45,13 @@ function RatingRow({
           <button
             key={it.v}
             type="button"
+            aria-pressed={active}
             onClick={() => onChange(it.v)}
             className={[
-              'w-full rounded-xl border px-3 py-3 text-left',
-              'transition focus:outline-none focus:ring-2 focus:ring-white/20',
+              'w-full rounded-xl border px-3 py-3 text-left transition',
+              'focus:outline-none focus:ring-2 focus:ring-white/20',
               active
-                ? 'border-white/30 bg-white/10'
+                ? 'border-white/40 bg-white/10 ring-1 ring-white/20'
                 : 'border-white/10 hover:border-white/20',
             ].join(' ')}
           >
@@ -70,7 +72,7 @@ export function WorkoutDetailsModal({
   address: string
   onSubmit: (meta: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) => Promise<void>
 }) {
-  // Steps: 1=details, 2=rating, 3=rough (only if rating<=1), 4=review
+  // Steps: 1 = details, 2 = rating, 3 = rough (only if rating<=1), 4 = review
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
 
   const [title, setTitle] = useState('')
@@ -81,36 +83,40 @@ export function WorkoutDetailsModal({
 
   const todayLabel = useMemo(() => formatToday(), [])
 
-  // figure total steps dynamically
   const showRough = rating !== null && rating <= 1
   const totalSteps = showRough ? 4 : 3
   const pct = useMemo(() => (step / totalSteps) * 100, [step, totalSteps])
 
-  // draft autosave
+  // --- autosave draft (normalize rating to undefined for storage) ---
   useEffect(() => {
     const id = setInterval(() => {
-      saveDraft(address, { title, description, rating, lowlight })
+      const ratingForDraft = rating === null ? undefined : (rating as RatingUnion)
+      saveDraft(address, { title, description, rating: ratingForDraft, lowlight })
     }, 1500)
     return () => clearInterval(id)
   }, [address, title, description, rating, lowlight])
 
-  // load draft
+  // --- load draft safely ---
   useEffect(() => {
     const d = loadDraft(address)
     if (!d) return
     if (typeof d.title === 'string') setTitle(d.title)
     if (typeof d.description === 'string') setDescription(d.description)
-    if (typeof d.rating === 'number' || d.rating === null) setRating(d.rating)
+
+    if (typeof d.rating === 'number' && d.rating >= 0 && d.rating <= 5) {
+      setRating(d.rating)
+    } else {
+      setRating(null)
+    }
+
     if (d.lowlight) setLowlight(d.lowlight as any)
   }, [address])
 
   const goFromRating = () => {
-    // If no rating chosen, skip to review
     if (rating === null) {
-      setStep(4)
+      setStep(4) // skip rating -> review
       return
     }
-    // If rating is 1 or less -> rough step; else -> review
     setStep(rating <= 1 ? 3 : 4)
   }
 
@@ -119,7 +125,7 @@ export function WorkoutDetailsModal({
     await onSubmit({
       title: title || undefined,
       description: description || undefined,
-      rating: (rating ?? 0) as 0 | 1 | 2 | 3 | 4 | 5, // keep your existing type expectation
+      rating: (rating ?? 3) as RatingUnion, // safe default if skipped
       lowlight,
     })
     clearDraft(address)
@@ -182,7 +188,7 @@ export function WorkoutDetailsModal({
         <div className="space-y-5">
           <div>
             <div className="mb-1 text-base font-medium">How did it feel?</div>
-            <div className="mb-3 text-sm text-neutral-400">Rate your overall experience</div>
+            <div className="mb-3 text-sm text-neutral-400">Rate your overall experience (optional)</div>
             <RatingRow value={rating} onChange={setRating} />
             <div className="mt-2 text-xs text-neutral-500">
               {rating === null ? 'You can skip rating and continue.' : 'You can change this before submitting.'}
