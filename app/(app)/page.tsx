@@ -1,7 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { StatsCard } from '@/components/StatsCard'
 import { ProgressBar } from '@/components/ProgressBar'
@@ -15,16 +15,35 @@ export default function Page() {
   const { address, isConnected } = useAccount()
   const [open, setOpen] = useState(false)
   const [summary, setSummary] = useState<React.ReactNode>(null)
+  const [stats, setStatsState] = useState({
+    current: 0,
+    best: 0,
+    total: 0,
+  })
 
-  const current = 12, best = 30, total = 74
+  // Load stats from storage whenever wallet connects
+  useEffect(() => {
+    if (!address) return
+    const s = getStats(address)
+    setStatsState({
+      current: s.currentStreak,
+      best: s.bestStreak,
+      total: s.totalCheckIns,
+    })
+  }, [address])
 
   // Handle check-in submission
   const submit = async (payload: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) => {
     if (!address) return
     const now = new Date().toISOString()
-    const meta: CheckinMeta = { version: 'misfit-checkin-1', userId: address, checkinAt: now, ...payload }
-    addCheckin(address, meta)
+    const meta: CheckinMeta = {
+      version: 'misfit-checkin-1',
+      userId: address,
+      checkinAt: now,
+      ...payload,
+    }
 
+    addCheckin(address, meta)
     const s = getStats(address)
     const last = s.lastCheckInDate ? new Date(s.lastCheckInDate) : null
     const lastDay = last ? Date.UTC(last.getUTCFullYear(), last.getUTCMonth(), last.getUTCDate()) : null
@@ -38,10 +57,16 @@ export default function Page() {
     } else {
       s.currentStreak = 1
     }
+
     s.bestStreak = Math.max(s.bestStreak, s.currentStreak)
     s.totalCheckIns += 1
     s.lastCheckInDate = now
     setStats(address, s)
+    setStatsState({
+      current: s.currentStreak,
+      best: s.bestStreak,
+      total: s.totalCheckIns,
+    })
 
     setSummary(
       <div className="space-y-2">
@@ -80,7 +105,9 @@ export default function Page() {
             Check in for Today
           </button>
         ) : (
-          <div className="text-sm text-muted-foreground">Connect your wallet to check in.</div>
+          <div className="text-sm text-muted-foreground">
+            Connect your wallet to check in.
+          </div>
         )}
       </div>
 
@@ -88,9 +115,9 @@ export default function Page() {
       <section>
         <h2 className="text-2xl font-semibold mb-6">Your Stats</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatsCard label="Current Streak" value={current} icon="flame" highlight />
-          <StatsCard label="Best Streak" value={best} icon="trophy" />
-          <StatsCard label="Total Check-ins" value={total} icon="calendar" />
+          <StatsCard label="Current Streak" value={stats.current} icon="flame" highlight />
+          <StatsCard label="Best Streak" value={stats.best} icon="trophy" />
+          <StatsCard label="Total Check-ins" value={stats.total} icon="calendar" />
         </div>
       </section>
 
@@ -101,12 +128,12 @@ export default function Page() {
           Track your overall streak and challenge milestones
         </p>
         <div className="space-y-4">
-          <ProgressBar label="30-Day Streak" current={current} total={30} />
-          <ProgressBar label="Mobility Month" current={12} total={30} colorClass="bg-teal-500" />
+          <ProgressBar label="30-Day Streak" current={stats.current} total={30} />
+          <ProgressBar label="Mobility Month" current={stats.current} total={30} colorClass="bg-teal-500" />
         </div>
       </section>
 
-      {/* Modal and success sheet */}
+      {/* Modal + Success */}
       {address && (
         <>
           <WorkoutDetailsModal address={address} onSubmit={submit} open={open} setOpen={setOpen} />
