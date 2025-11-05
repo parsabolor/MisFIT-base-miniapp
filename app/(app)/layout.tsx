@@ -1,13 +1,12 @@
-'use client'
-
-import { RootProvider } from '../rootProvider'
-import SiteTabs from '@/components/SiteTabs'
+import SiteTabs from '@/components/SiteTabs';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <RootProvider>
-      <SiteTabs />
-      {children}
-    </RootProvider>
-  )
+    <html lang="en">
+      <body className="bg-background text-foreground">
+        <SiteTabs />
+        {children}
+      </body>
+    </html>
+  );
 }
