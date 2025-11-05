@@ -1,5 +1,6 @@
 import "./globals.css"
 import type { Metadata } from "next"
+import RootProviders from "@/components/RootProviders"
 
 export const metadata: Metadata = {
   title: "MisFIT Check-ins",
@@ -13,11 +14,25 @@ export const metadata: Metadata = {
   other: { manifest: "/manifest.json" },
 }
 
+function ThemeInitScript() {
+  const code = `
+  try {
+    const stored = localStorage.getItem('misfit-theme') || 'system';
+    const root = document.documentElement;
+    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = stored === 'system' ? (systemDark ? 'dark' : 'light') : stored;
+    root.classList.remove('light','dark');
+    root.classList.add(theme);
+  } catch {}
+  `
+  return <script dangerouslySetInnerHTML={{ __html: code }} />
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-background text-foreground antialiased">
-        {children}
+        <RootProviders>{children}</RootProviders>
       </body>
     </html>
   )
