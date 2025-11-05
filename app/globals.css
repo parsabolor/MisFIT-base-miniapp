@@ -7,7 +7,7 @@
 /* ---------- Semantic Color Tokens ---------- */
 /* Base = Dark mode first */
 :root {
-  /* Dark mode (primary theme) */
+  /* Dark (unchanged) */
   --background: 20 14% 4%;
   --foreground: 45 25% 91%;
 
@@ -37,35 +37,38 @@
   --destructive-foreground: 0 0% 100%;
 }
 
-/* Light mode override */
+/* ---------- High-contrast Light override ---------- */
 .light {
-  --background: 0 0% 94.12%;
-  --foreground: 0 0% 10.2%;
+  /* Background / text */
+  --background: 0 0% 98%;         /* #FAFAFA */
+  --foreground: 0 0% 12%;         /* #1F1F1F */
 
-  --card: 0 0% 98.82%;
-  --card-foreground: 0 0% 10.2%;
+  /* Surfaces */
+  --card: 0 0% 100%;              /* #FFFFFF */
+  --card-foreground: 0 0% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 12%;
 
-  --popover: 0 0% 98.82%;
-  --popover-foreground: 0 0% 10.2%;
+  /* Lines / inputs / ring */
+  --border: 0 0% 84%;             /* #D6D6D6 */
+  --input: 0 0% 88%;              /* #E0E0E0 */
+  --ring: 0 0% 12%;
 
-  --border: 0 0% 90.98%;
-  --input: 0 0% 90.98%;
-  --ring: 0 0% 10.2%;
+  /* Muted text */
+  --muted: 0 0% 92%;              /* #EBEBEB */
+  --muted-foreground: 0 0% 43%;   /* #6E6E6E */
 
-  --muted: 0 0% 89%;
-  --muted-foreground: 0 0% 50%;
-
-  --primary: 0 85% 55%;
+  /* Brand */
+  --primary: 0 85% 50%;           /* slightly deeper for contrast */
   --primary-foreground: 0 0% 100%;
-
-  --accent: 0 85% 55%;
+  --accent: 0 85% 50%;
   --accent-foreground: 0 0% 100%;
 
-  --secondary: 0 0% 77%;
+  /* Secondary / destructive */
+  --secondary: 0 0% 74%;
   --secondary-foreground: 0 0% 10%;
-
-  --destructive: 0 72% 55%;
-  --destructive-foreground: 0 0% 98%;
+  --destructive: 0 72% 48%;
+  --destructive-foreground: 0 0% 100%;
 }
 
 /* ---------- Challenge Themes ---------- */
@@ -97,6 +100,13 @@
 .input::placeholder,
 .textarea::placeholder {
   color: hsl(var(--muted-foreground));
+}
+
+/* Light: ensure true white field and stronger hover */
+.light .input,
+.light .textarea {
+  background: #fff;
+  border-color: hsl(var(--border));
 }
 
 .input:hover,
@@ -131,17 +141,13 @@
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
 }
-
-.btn-primary:hover {
-  opacity: 0.9;
-}
+.btn-primary:hover { opacity: 0.9; }
 
 .btn-outline {
   border: 1px solid hsl(var(--border));
   color: hsl(var(--foreground));
   background: transparent;
 }
-
 .btn-outline:hover {
   background-color: hsla(var(--foreground) / 0.06);
 }
@@ -159,15 +165,15 @@
 .hover-elevate:hover {
   box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.04) inset;
 }
-
 .active-elevate-2:active {
   box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.09) inset;
 }
 
+/* Light readability helpers */
+:root.light ::placeholder { color: #6b7280; } /* neutral-500 */
+:root.light small, :root.light .text-xs { color: #6b7280; }
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
