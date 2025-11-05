@@ -3,12 +3,12 @@
 @tailwind utilities;
 
 /* ---------------- Fonts ---------------- */
-/* You can still import Inter + JetBrains Mono via <link> or next/font */
+/* Inter + JetBrains Mono via <link> or next/font */
 
 /* ---------------- Color Tokens ---------------- */
 /* Base = Dark mode first */
 :root {
-  /* Dark mode (unchanged) */
+  /* Dark mode (primary theme) */
   --background: 20 14% 4%;
   --foreground: 45 25% 91%;
 
@@ -23,9 +23,9 @@
   --ring: 0 0% 100%;
 
   --muted: 222 15% 20%;
-  --muted-foreground: 0 0% 65%; /* slightly brighter text for subtle contrast */
+  --muted-foreground: 0 0% 65%; /* slightly brighter for dark mode */
 
-  --primary: 0 85% 60%;
+  --primary: 0 85% 60%; /* #F54538 */
   --primary-foreground: 0 0% 100%;
 
   --accent: 0 85% 60%;
@@ -38,10 +38,10 @@
   --destructive-foreground: 0 0% 100%;
 }
 
-/* Light mode – better text contrast, darker hierarchy */
+/* ---------------- Light Mode Override ---------------- */
 .light {
   --background: 0 0% 94.12%;
-  --foreground: 0 0% 7%;             /* darker base text */
+  --foreground: 0 0% 7%;
   --card: 0 0% 98.82%;
   --card-foreground: 0 0% 10%;
   --popover: 0 0% 98.82%;
@@ -52,7 +52,8 @@
   --ring: 0 0% 10.2%;
 
   --muted: 0 0% 89%;
-  --muted-foreground: 0 0% 35%;      /* much darker muted text */
+  --muted-foreground: 0 0% 35%; /* darker text for contrast */
+
   --primary: 0 85% 55%;
   --primary-foreground: 0 0% 100%;
   --accent: 0 85% 55%;
@@ -69,7 +70,7 @@
 .mobility-theme { --accent: 174 62% 40%; }
 .strength-theme { --accent: 28 90% 55%; }
 
-/* ---------------- Utilities ---------------- */
+/* ---------------- Utility Helpers ---------------- */
 .bg-background { background-color: hsl(var(--background)); }
 .text-foreground { color: hsl(var(--foreground)); }
 .bg-card { background-color: hsl(var(--card)); }
@@ -78,35 +79,143 @@
 .bg-primary { background-color: hsl(var(--primary)); }
 .text-primary-foreground { color: hsl(var(--primary-foreground)); }
 
-/* ---------------- Typography tweaks ---------------- */
-/* Headings are always darker and bolder in light mode */
+/* ---------------- Headings / Typography ---------------- */
 .light h1, .light h2, .light h3, .light h4 {
   color: hsl(0 0% 5%);
 }
-
-.light p, .light span, .light label, .light input, .light td, .light th {
+.light p, .light span, .light label, .light td, .light th {
   color: hsl(var(--foreground));
 }
-
-/* Muted labels and helper text more readable */
 .light .text-muted-foreground,
 .light small,
 .light .text-sm {
   color: hsl(var(--muted-foreground));
 }
-
-/* Placeholder text darker for accessibility */
 .light ::placeholder {
   color: hsl(0 0% 45%);
 }
 
-/* Buttons – unchanged, but text color pops more */
+/* ---------------- Inputs & Textareas ---------------- */
+.input,
+.textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+
+  font: inherit;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--input));
+
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  line-height: 1.45;
+
+  appearance: none;
+  outline: none;
+  transition:
+    border-color .15s ease,
+    box-shadow .15s ease,
+    background-color .15s ease,
+    color .15s ease;
+}
+
+.input:hover,
+.textarea:hover {
+  border-color: hsl(var(--border));
+}
+
+.input:focus,
+.textarea:focus {
+  border-color: transparent;
+  box-shadow: 0 0 0 3px hsla(var(--ring) / 0.28);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: hsl(var(--muted-foreground));
+  opacity: 1;
+}
+
+/* Disabled / readonly */
+.input:disabled,
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.input[readonly],
+.textarea[readonly] {
+  background: hsla(var(--card) / 0.6);
+}
+
+/* Autofill fix */
+.input:-webkit-autofill,
+.textarea:-webkit-autofill {
+  -webkit-text-fill-color: hsl(var(--foreground)) !important;
+  transition: background-color 9999s ease-out;
+}
+
+/* Textarea sizing */
+.textarea { min-height: 7rem; resize: vertical; }
+
+/* Input helper for counters */
+.field { position: relative; }
+.field-counter {
+  position: absolute;
+  top: 0;
+  right: 0.5rem;
+  transform: translateY(-130%);
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ---------------- Buttons ---------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  padding: 0.6rem 1.2rem;
+}
+
 .btn-primary {
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
 }
+.btn-primary:hover { opacity: 0.9; }
+
+.btn-outline {
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+  background: transparent;
+}
+.btn-outline:hover {
+  background-color: hsla(var(--foreground) / 0.06);
+}
+
+/* ---------------- Cards / Panels ---------------- */
+.panel {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 4px hsla(var(--foreground) / 0.05);
+}
+
+/* ---------------- Misc ---------------- */
+.hover-elevate:hover {
+  box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.04) inset;
+}
+.active-elevate-2:active {
+  box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.09) inset;
+}
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
