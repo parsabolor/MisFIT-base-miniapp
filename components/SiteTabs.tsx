@@ -3,9 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAccount } from 'wagmi';
-import type { Route } from 'next';
 
-type Tab = { label: string; href: Route };
+type Tab = { label: string; href: string };
 
 const TABS: Tab[] = [
   { label: 'Dashboard',   href: '/' },
