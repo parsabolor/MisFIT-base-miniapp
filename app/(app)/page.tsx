@@ -1,7 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import WalletConnect from '@/components/WalletConnect'
 import { StatsCard } from '@/components/StatsCard'
@@ -9,6 +9,10 @@ import { ProgressBar } from '@/components/ProgressBar'
 import { WorkoutDetailsModal } from '@/components/WorkoutDetailsModal'
 import { addCheckin, getStats, setStats } from '@/lib/storage'
 import type { CheckinMeta } from '@/lib/types'
+
+function startOfUtcDay(d: Date) {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+}
 
 export default function Page() {
   const { address, isConnected } = useAccount()
@@ -20,14 +24,21 @@ export default function Page() {
     lastCheckInDate: null as string | null,
   })
 
-  // --- Load stats on wallet connect ---
+  // Load stats when wallet connects/changes
   useEffect(() => {
     if (!address) return
     const s = getStats(address)
     if (s) setLocalStats(s)
   }, [address])
 
-  // --- Submit handler for modal ---
+  // Have they already checked in today?
+  const alreadyToday = useMemo(() => {
+    if (!stats.lastCheckInDate) return false
+    const last = new Date(stats.lastCheckInDate)
+    return startOfUtcDay(last) === startOfUtcDay(new Date())
+  }, [stats.lastCheckInDate])
+
+  // Submit handler (no double-counting on same day)
   async function submit(payload: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) {
     if (!address) return
 
@@ -38,30 +49,31 @@ export default function Page() {
       checkinAt: now,
       ...payload,
     }
+    // You can allow multiple logs per day, but stats won’t change on duplicates:
     addCheckin(address, meta)
 
-    // update streaks
     const s = getStats(address)
     const last = s.lastCheckInDate ? new Date(s.lastCheckInDate) : null
-    const lastDay = last
-      ? Date.UTC(last.getUTCFullYear(), last.getUTCMonth(), last.getUTCDate())
-      : null
-    const today = new Date(now)
-    const todayDay = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
+    const lastDay = last ? startOfUtcDay(last) : null
+    const todayDay = startOfUtcDay(new Date(now))
+    const isDup = lastDay === todayDay
 
-    if (lastDay === todayDay) {
-      // already checked in today, no change
-    } else if (last && todayDay - (lastDay as number) === 24 * 60 * 60 * 1000) {
-      s.currentStreak += 1
+    if (!isDup) {
+      if (last && todayDay - (lastDay as number) === 24 * 60 * 60 * 1000) {
+        s.currentStreak += 1
+      } else {
+        s.currentStreak = 1
+      }
+      s.bestStreak = Math.max(s.bestStreak, s.currentStreak)
+      s.totalCheckIns += 1
+      s.lastCheckInDate = now
     } else {
-      s.currentStreak = 1
+      // keep the original stats; optionally keep the original lastCheckInDate
+      // s.lastCheckInDate = s.lastCheckInDate // no change
     }
 
-    s.bestStreak = Math.max(s.bestStreak, s.currentStreak)
-    s.totalCheckIns += 1
-    s.lastCheckInDate = now
     setStats(address, s)
-    setLocalStats(s) // refresh UI immediately
+    setLocalStats(s)
     setOpen(false)
   }
 
@@ -76,20 +88,25 @@ export default function Page() {
         <p className="text-muted-foreground max-w-2xl">
           Track your daily check-ins and build unstoppable streaks
         </p>
+
         <WalletConnect />
 
         {isConnected ? (
           <button
             onClick={() => setOpen(true)}
-            className="mt-2 inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold
-                       bg-primary text-primary-foreground hover:opacity-90 transition"
+            disabled={alreadyToday}
+            className={[
+              'mt-2 inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold transition',
+              alreadyToday
+                ? 'bg-primary/40 text-primary-foreground/70 cursor-not-allowed'
+                : 'bg-primary text-primary-foreground hover:opacity-90',
+            ].join(' ')}
+            title={alreadyToday ? 'You have already checked in today' : 'Start your daily check-in'}
           >
-            Check in for Today
+            {alreadyToday ? 'Already checked in today' : 'Check in for Today'}
           </button>
         ) : (
-          <div className="text-sm text-muted-foreground">
-            Connect your wallet to check in.
-          </div>
+          <div className="text-sm text-muted-foreground">Connect your wallet to check in.</div>
         )}
       </div>
 
@@ -119,7 +136,7 @@ export default function Page() {
         </section>
       )}
 
-      {/* Modal (controlled) */}
+      {/* Modal */}
       {isConnected && address && (
         <WorkoutDetailsModal
           open={open}
