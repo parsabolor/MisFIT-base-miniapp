@@ -20,6 +20,7 @@
     "wagmi": "^2.10.0",
     "zustand": "^4.5.4",
     "lucide-react": "^0.451.0",
+    "framer-motion": "^11.2.10",
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {

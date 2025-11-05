@@ -1,15 +1,71 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
+import WalletConnect from '@/components/WalletConnect'
 import { StatsCard } from '@/components/StatsCard'
 import { ProgressBar } from '@/components/ProgressBar'
-import WalletConnect from '@/components/WalletConnect'
+import { WorkoutDetailsModal } from '@/components/WorkoutDetailsModal'
+import { addCheckin, getStats, setStats } from '@/lib/storage'
+import type { CheckinMeta } from '@/lib/types'
 
 export default function Page() {
-  const { isConnected } = useAccount()
-  const current = 12, best = 30, total = 74
+  const { address, isConnected } = useAccount()
+  const [open, setOpen] = useState(false)
+  const [stats, setLocalStats] = useState({
+    currentStreak: 0,
+    bestStreak: 0,
+    totalCheckIns: 0,
+    lastCheckInDate: null as string | null,
+  })
+
+  // --- Load stats on wallet connect ---
+  useEffect(() => {
+    if (!address) return
+    const s = getStats(address)
+    if (s) setLocalStats(s)
+  }, [address])
+
+  // --- Submit handler for modal ---
+  async function submit(payload: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) {
+    if (!address) return
+
+    const now = new Date().toISOString()
+    const meta: CheckinMeta = {
+      version: 'misfit-checkin-1',
+      userId: address,
+      checkinAt: now,
+      ...payload,
+    }
+    addCheckin(address, meta)
+
+    // update streaks
+    const s = getStats(address)
+    const last = s.lastCheckInDate ? new Date(s.lastCheckInDate) : null
+    const lastDay = last
+      ? Date.UTC(last.getUTCFullYear(), last.getUTCMonth(), last.getUTCDate())
+      : null
+    const today = new Date(now)
+    const todayDay = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
+
+    if (lastDay === todayDay) {
+      // already checked in today, no change
+    } else if (last && todayDay - (lastDay as number) === 24 * 60 * 60 * 1000) {
+      s.currentStreak += 1
+    } else {
+      s.currentStreak = 1
+    }
+
+    s.bestStreak = Math.max(s.bestStreak, s.currentStreak)
+    s.totalCheckIns += 1
+    s.lastCheckInDate = now
+    setStats(address, s)
+    setLocalStats(s) // refresh UI immediately
+    setOpen(false)
+  }
+
+  const { currentStreak, bestStreak, totalCheckIns } = stats
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 md:py-14 space-y-12">
@@ -22,41 +78,56 @@ export default function Page() {
         </p>
         <WalletConnect />
 
-        {/* CTA */}
         {isConnected ? (
-          <Link
-            href="/checkin"
+          <button
+            onClick={() => setOpen(true)}
             className="mt-2 inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold
                        bg-primary text-primary-foreground hover:opacity-90 transition"
           >
             Check in for Today
-          </Link>
+          </button>
         ) : (
-          <div className="text-sm text-muted-foreground">Connect your wallet to check in.</div>
+          <div className="text-sm text-muted-foreground">
+            Connect your wallet to check in.
+          </div>
         )}
       </div>
 
       {/* Stats */}
-      <section>
-        <h2 className="text-2xl font-semibold mb-6">Your Stats</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatsCard label="Current Streak" value={current} icon="flame" highlight />
-          <StatsCard label="Best Streak" value={best} icon="trophy" />
-          <StatsCard label="Total Check-ins" value={total} icon="calendar" />
-        </div>
-      </section>
+      {isConnected && (
+        <section>
+          <h2 className="text-2xl font-semibold mb-6">Your Stats</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <StatsCard label="Current Streak" value={currentStreak} icon="flame" highlight />
+            <StatsCard label="Best Streak" value={bestStreak} icon="trophy" />
+            <StatsCard label="Total Check-ins" value={totalCheckIns} icon="calendar" />
+          </div>
+        </section>
+      )}
 
       {/* Progress */}
-      <section className="rounded-2xl bg-card p-8 border border-white/10 shadow-card">
-        <h3 className="text-xl font-semibold mb-2">Progress Towards Badges</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Track your overall streak and challenge milestones
-        </p>
-        <div className="space-y-4">
-          <ProgressBar label="30-Day Streak" current={current} total={30} />
-          <ProgressBar label="Mobility Month" current={12} total={30} colorClass="bg-teal-500" />
-        </div>
-      </section>
+      {isConnected && (
+        <section className="rounded-2xl bg-card p-8 border border-white/10 shadow-card">
+          <h3 className="text-xl font-semibold mb-2">Progress Towards Badges</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Track your overall streak and challenge milestones
+          </p>
+          <div className="space-y-4">
+            <ProgressBar label="30-Day Streak" current={currentStreak} total={30} />
+            <ProgressBar label="Mobility Month" current={currentStreak} total={30} colorClass="bg-teal-500" />
+          </div>
+        </section>
+      )}
+
+      {/* Modal (controlled) */}
+      {isConnected && address && (
+        <WorkoutDetailsModal
+          open={open}
+          onClose={() => setOpen(false)}
+          address={address}
+          onSubmit={submit}
+        />
+      )}
     </div>
   )
 }
