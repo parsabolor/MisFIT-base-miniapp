@@ -10,25 +10,45 @@ import { WorkoutDetailsModal } from '@/components/WorkoutDetailsModal'
 import { addCheckin, getStats, setStats } from '@/lib/storage'
 import type { CheckinMeta } from '@/lib/types'
 
+type Stats = {
+  currentStreak: number
+  bestStreak: number
+  totalCheckIns: number
+  lastCheckInDate: string | null
+}
+
 function startOfUtcDay(d: Date) {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+}
+
+function readPseudonym(address?: string | null) {
+  if (!address) return ''
+  try {
+    const raw = localStorage.getItem(`misfit-profile-${address}`)
+    const obj = raw ? JSON.parse(raw) : null
+    return obj?.pseudonym || ''
+  } catch {
+    return ''
+  }
 }
 
 export default function Page() {
   const { address, isConnected } = useAccount()
   const [open, setOpen] = useState(false)
-  const [stats, setLocalStats] = useState({
+  const [pseudo, setPseudo] = useState('')
+  const [stats, setLocalStats] = useState<Stats>({
     currentStreak: 0,
     bestStreak: 0,
     totalCheckIns: 0,
-    lastCheckInDate: null as string | null,
+    lastCheckInDate: null,
   })
 
-  // Load stats when wallet connects/changes
+  // Load stats + pseudonym when wallet connects/changes
   useEffect(() => {
     if (!address) return
     const s = getStats(address)
     if (s) setLocalStats(s)
+    setPseudo(readPseudonym(address))
   }, [address])
 
   // Have they already checked in today?
@@ -38,24 +58,24 @@ export default function Page() {
     return startOfUtcDay(last) === startOfUtcDay(new Date())
   }, [stats.lastCheckInDate])
 
-  // Submit handler (no double-counting on same day)
+  // Submit handler (allow multiple logs but don’t bump streak twice in a day)
   async function submit(payload: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) {
     if (!address) return
 
-    const now = new Date().toISOString()
+    const nowIso = new Date().toISOString()
     const meta: CheckinMeta = {
       version: 'misfit-checkin-1',
       userId: address,
-      checkinAt: now,
+      checkinAt: nowIso,
       ...payload,
     }
-    // You can allow multiple logs per day, but stats won’t change on duplicates:
+
     addCheckin(address, meta)
 
     const s = getStats(address)
     const last = s.lastCheckInDate ? new Date(s.lastCheckInDate) : null
     const lastDay = last ? startOfUtcDay(last) : null
-    const todayDay = startOfUtcDay(new Date(now))
+    const todayDay = startOfUtcDay(new Date(nowIso))
     const isDup = lastDay === todayDay
 
     if (!isDup) {
@@ -66,11 +86,9 @@ export default function Page() {
       }
       s.bestStreak = Math.max(s.bestStreak, s.currentStreak)
       s.totalCheckIns += 1
-      s.lastCheckInDate = now
-    } else {
-      // keep the original stats; optionally keep the original lastCheckInDate
-      // s.lastCheckInDate = s.lastCheckInDate // no change
+      s.lastCheckInDate = nowIso
     }
+    // else: keep stats unchanged for duplicate same-day check-ins
 
     setStats(address, s)
     setLocalStats(s)
@@ -82,9 +100,17 @@ export default function Page() {
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 md:py-14 space-y-12">
       {/* Header */}
-      <div className="flex flex-col items-center gap-6 text-center">
+      <div className="flex flex-col items-center gap-4 text-center">
         <img src="/logo.png" alt="MisFIT Logo" className="w-24 h-24 md:w-32 md:h-32" />
         <h1 className="text-4xl md:text-5xl font-bold">MisFIT Check-ins</h1>
+
+        {/* Welcome line if pseudonym set */}
+        {pseudo && (
+          <div className="text-sm text-neutral-300">
+            Welcome, <span className="font-semibold">{pseudo}</span>
+          </div>
+        )}
+
         <p className="text-muted-foreground max-w-2xl">
           Track your daily check-ins and build unstoppable streaks
         </p>
@@ -136,7 +162,7 @@ export default function Page() {
         </section>
       )}
 
-      {/* Modal */}
+      {/* Check-in Modal */}
       {isConnected && address && (
         <WorkoutDetailsModal
           open={open}
