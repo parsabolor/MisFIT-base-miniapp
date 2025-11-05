@@ -13,11 +13,14 @@ type Step = 1|2|3|4 // 4 = review
 export function WorkoutDetailsModal({
   address,
   onSubmit,
+  open,
+  setOpen,
 }: {
   address: string
   onSubmit: (meta: Omit<CheckinMeta,'version'|'userId'|'checkinAt'>) => Promise<void>
+  open: boolean
+  setOpen: (v: boolean) => void
 }) {
-  const [open, setOpen] = useState(false)
   const [step, setStep] = useState<Step>(1)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -71,15 +74,6 @@ export function WorkoutDetailsModal({
 
   return (
     <>
-      {/* Trigger */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-400"
-        >
-          Start Check-in
-        </button>
-      </div>
 
       {open && (
         <div className="fixed inset-0 z-50">
