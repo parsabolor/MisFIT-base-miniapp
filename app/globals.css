@@ -2,12 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fonts (Inter + JetBrains Mono via <link> or next/font) */
+/* ---------------- Fonts (Inter / JetBrains via next/font or <link>) ---------------- */
 
-/* ---------- Semantic Color Tokens ---------- */
-/* Base = Dark mode first */
+/* ---------------- Semantic Color Tokens ---------------- */
+/* Base = DARK MODE (default) */
 :root {
-  /* Dark (unchanged) */
+  /* Dark */
   --background: 20 14% 4%;
   --foreground: 45 25% 91%;
 
@@ -22,9 +22,9 @@
   --ring: 0 0% 100%;
 
   --muted: 222 15% 20%;
-  --muted-foreground: 0 0% 60%;
+  --muted-foreground: 0 0% 62%;
 
-  --primary: 0 85% 60%;           /* #F54538 / brand red */
+  --primary: 0 85% 60%;          /* Brand red */
   --primary-foreground: 0 0% 100%;
 
   --accent: 0 85% 60%;
@@ -37,54 +37,53 @@
   --destructive-foreground: 0 0% 100%;
 }
 
-/* ---------- High-contrast Light override ---------- */
+/* Light mode overrides — tuned for readability */
 .light {
-  /* Background / text */
-  --background: 0 0% 98%;         /* #FAFAFA */
-  --foreground: 0 0% 12%;         /* #1F1F1F */
+  /* Slightly off-white canvas + real black/near-black text */
+  --background: 0 0% 97%;
+  --foreground: 0 0% 10%;
 
-  /* Surfaces */
-  --card: 0 0% 100%;              /* #FFFFFF */
-  --card-foreground: 0 0% 12%;
+  /* True white surfaces for cards/popovers for max contrast */
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 10%;
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 12%;
+  --popover-foreground: 0 0% 10%;
 
-  /* Lines / inputs / ring */
-  --border: 0 0% 84%;             /* #D6D6D6 */
-  --input: 0 0% 88%;              /* #E0E0E0 */
-  --ring: 0 0% 12%;
+  /* Darker borders/inputs so components don’t wash out */
+  --border: 0 0% 82%;
+  --input: 0 0% 78%;
+  --ring: 0 0% 20%;
 
-  /* Muted text */
-  --muted: 0 0% 92%;              /* #EBEBEB */
-  --muted-foreground: 0 0% 43%;   /* #6E6E6E */
+  /* Make “muted” still readable on white */
+  --muted: 0 0% 92%;
+  --muted-foreground: 0 0% 42%;
 
-  /* Brand */
-  --primary: 0 85% 50%;           /* slightly deeper for contrast */
+  /* Brand colors slightly deeper so they pop on white */
+  --primary: 0 85% 55%;
   --primary-foreground: 0 0% 100%;
-  --accent: 0 85% 50%;
+  --accent: 0 85% 55%;
   --accent-foreground: 0 0% 100%;
 
-  /* Secondary / destructive */
-  --secondary: 0 0% 74%;
-  --secondary-foreground: 0 0% 10%;
+  --secondary: 0 0% 30%;
+  --secondary-foreground: 0 0% 100%;
   --destructive: 0 72% 48%;
   --destructive-foreground: 0 0% 100%;
 }
 
-/* ---------- Challenge Themes ---------- */
+/* ---------------- Optional challenge theme accents ---------------- */
 .mobility-theme { --accent: 174 62% 40%; }  /* teal */
 .strength-theme { --accent: 28 90% 55%; }   /* orange */
 
-/* ---------- Utility Helpers ---------- */
-.bg-background { background-color: hsl(var(--background)); }
-.text-foreground { color: hsl(var(--foreground)); }
-.bg-card { background-color: hsl(var(--card)); }
-.border-default { border-color: hsl(var(--border)); }
-.text-muted-foreground { color: hsl(var(--muted-foreground)); }
-.bg-primary { background-color: hsl(var(--primary)); }
+/* ---------------- Small helpers bound to tokens ---------------- */
+.bg-background           { background-color: hsl(var(--background)); }
+.text-foreground         { color: hsl(var(--foreground)); }
+.bg-card                 { background-color: hsl(var(--card)); }
+.text-muted-foreground   { color: hsl(var(--muted-foreground)); }
+.bg-primary              { background-color: hsl(var(--primary)); }
 .text-primary-foreground { color: hsl(var(--primary-foreground)); }
+.border-default          { border-color: hsl(var(--border)); }
 
-/* ---------- Inputs & Textareas ---------- */
+/* ---------------- Inputs & Textareas (high-contrast placeholders) ---------------- */
 .input,
 .textarea {
   width: 100%;
@@ -99,14 +98,8 @@
 
 .input::placeholder,
 .textarea::placeholder {
+  /* Stronger in light; softer in dark via current token */
   color: hsl(var(--muted-foreground));
-}
-
-/* Light: ensure true white field and stronger hover */
-.light .input,
-.light .textarea {
-  background: #fff;
-  border-color: hsl(var(--border));
 }
 
 .input:hover,
@@ -121,19 +114,12 @@
   box-shadow: 0 0 0 3px hsla(var(--ring) / 0.25);
 }
 
-.textarea {
-  min-height: 7rem;
-  resize: vertical;
-}
+.textarea { min-height: 7rem; resize: vertical; }
 
-/* ---------- Buttons ---------- */
+/* ---------------- Buttons ---------------- */
 .btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.75rem;
-  font-weight: 600;
-  transition: all 0.2s ease;
+  @apply inline-flex items-center justify-center rounded-xl font-semibold;
+  transition: all .2s ease;
   padding: 0.6rem 1.2rem;
 }
 
@@ -141,7 +127,7 @@
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
 }
-.btn-primary:hover { opacity: 0.9; }
+.btn-primary:hover { opacity: .9; }
 
 .btn-outline {
   border: 1px solid hsl(var(--border));
@@ -152,28 +138,70 @@
   background-color: hsla(var(--foreground) / 0.06);
 }
 
-/* ---------- Cards / Panels ---------- */
+/* ---------------- Cards / Panels / Shadows ---------------- */
 .panel {
   background-color: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-radius: 1rem;
   padding: 1.5rem;
-  box-shadow: 0 1px 4px hsla(var(--foreground) / 0.05);
+  box-shadow: 0 1px 4px hsla(var(--foreground) / 0.06);
 }
 
-/* ---------- Misc ---------- */
-.hover-elevate:hover {
-  box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.04) inset;
+/* A unified shadow utility for components that use `shadow-card` in your JSX */
+.shadow-card {
+  /* Dark gets a softer, wider glow; light gets a taller, subtle shadow */
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.04),
+    0 8px 24px rgba(0,0,0,.18);
 }
-.active-elevate-2:active {
-  box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.09) inset;
+.light .shadow-card {
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.06),
+    0 10px 28px rgba(0,0,0,.08);
 }
 
-/* Light readability helpers */
-:root.light ::placeholder { color: #6b7280; } /* neutral-500 */
-:root.light small, :root.light .text-xs { color: #6b7280; }
+/* ---------------- Tables (Leaderboard) ---------------- */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: hsl(var(--card));
+}
+.table thead th {
+  font-size: .75rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  background: hsla(var(--foreground) / 0.04);
+  border-bottom: 1px solid hsl(var(--border));
+  padding: .75rem 1rem;
+}
+.table tbody td {
+  border-top: 1px solid hsl(var(--border));
+  padding: .75rem 1rem;
+  color: hsl(var(--foreground));
+}
+.table tbody tr:hover {
+  background: hsla(var(--foreground) / 0.03);
+}
+
+/* ---------------- Nav tabs underline more visible in light ---------------- */
+.tab-underline {
+  position: relative;
+}
+.tab-underline.is-active::after {
+  content: "";
+  position: absolute;
+  left: .75rem; right: .75rem; bottom: -2px;
+  height: 2px;
+  background: hsl(var(--primary));
+  border-radius: 999px;
+}
+
+/* ---------------- Misc ---------------- */
+.hover-elevate:hover { box-shadow: 0 0 0 9999px rgba(255,255,255,0.04) inset; }
+.active-elevate-2:active { box-shadow: 0 0 0 9999px rgba(255,255,255,0.09) inset; }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
