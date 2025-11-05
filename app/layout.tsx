@@ -1,5 +1,6 @@
 import "./globals.css"
 import type { Metadata } from "next"
+import RootProviders from "@/components/RootProviders"
 
 export const metadata: Metadata = {
   title: "MisFIT Check-ins",
@@ -17,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-background text-foreground antialiased">
-        {children}
+        <RootProviders>{children}</RootProviders>
       </body>
     </html>
   )
