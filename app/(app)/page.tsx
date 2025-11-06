@@ -3,12 +3,20 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
+
 import WalletConnect from '@/components/WalletConnect'
 import { StatsCard } from '@/components/StatsCard'
 import { ProgressBar } from '@/components/ProgressBar'
 import { WorkoutDetailsModal } from '@/components/WorkoutDetailsModal'
 import { addCheckin, getStats, setStats } from '@/lib/storage'
 import type { CheckinMeta } from '@/lib/types'
+
+// NEW: on-chain helpers
+import {
+  useCheckedInToday,
+  useCheckInWrite,
+  useOnchainStats,
+} from '@/lib/chain/checkins'
 
 type Stats = {
   currentStreak: number
@@ -34,6 +42,14 @@ function readPseudonym(address?: string | null) {
 
 export default function Page() {
   const { address, isConnected } = useAccount()
+
+  // On-chain reads (used when available)
+  const { data: todayOnchain } = useCheckedInToday(address as any)
+  const { data: onchainStats } = useOnchainStats(address as any)
+
+  // Writer (on-chain check-in)
+  const { checkIn, isPending } = useCheckInWrite()
+
   const [open, setOpen] = useState(false)
   const [pseudo, setPseudo] = useState('')
   const [stats, setLocalStats] = useState<Stats>({
@@ -43,7 +59,7 @@ export default function Page() {
     lastCheckInDate: null,
   })
 
-  // Load stats + pseudonym when wallet connects/changes
+  // Hydrate local snapshot + pseudonym
   useEffect(() => {
     if (!address) return
     const s = getStats(address)
@@ -51,17 +67,31 @@ export default function Page() {
     setPseudo(readPseudonym(address))
   }, [address])
 
-  // Have they already checked in today?
-  const alreadyToday = useMemo(() => {
+  // If you want to display on-chain stats instead of local, you could
+  // map them into the UI here. For now we keep local display and use
+  // chain only to gate the "already today" lockout.
+  const alreadyTodayLocal = useMemo(() => {
     if (!stats.lastCheckInDate) return false
     const last = new Date(stats.lastCheckInDate)
     return startOfUtcDay(last) === startOfUtcDay(new Date())
   }, [stats.lastCheckInDate])
 
-  // Submit handler (allow multiple logs but don’t bump streak twice in a day)
+  // Prefer the chain flag when present
+  const alreadyToday = (todayOnchain as boolean | undefined) ?? alreadyTodayLocal
+
+  // Submit: first do the on-chain minimal check-in, then save rich local details
   async function submit(payload: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) {
     if (!address) return
 
+    // 1) On-chain tx (wallet pops). If user rejects or tx errors, stop.
+    try {
+      await checkIn()
+    } catch (e) {
+      console.error('checkIn failed or rejected', e)
+      return
+    }
+
+    // 2) Keep your rich local log (hybrid approach)
     const nowIso = new Date().toISOString()
     const meta: CheckinMeta = {
       version: 'misfit-checkin-1',
@@ -69,9 +99,9 @@ export default function Page() {
       checkinAt: nowIso,
       ...payload,
     }
-
     addCheckin(address, meta)
 
+    // 3) Optimistic local streak update for immediate UX feedback
     const s = getStats(address)
     const last = s.lastCheckInDate ? new Date(s.lastCheckInDate) : null
     const lastDay = last ? startOfUtcDay(last) : null
@@ -88,7 +118,6 @@ export default function Page() {
       s.totalCheckIns += 1
       s.lastCheckInDate = nowIso
     }
-    // else: keep stats unchanged for duplicate same-day check-ins
 
     setStats(address, s)
     setLocalStats(s)
@@ -120,16 +149,26 @@ export default function Page() {
         {isConnected ? (
           <button
             onClick={() => setOpen(true)}
-            disabled={alreadyToday}
+            disabled={alreadyToday || isPending}
             className={[
               'mt-2 inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold transition',
-              alreadyToday
+              alreadyToday || isPending
                 ? 'bg-primary/40 text-primary-foreground/70 cursor-not-allowed'
                 : 'bg-primary text-primary-foreground hover:opacity-90',
             ].join(' ')}
-            title={alreadyToday ? 'You have already checked in today' : 'Start your daily check-in'}
+            title={
+              alreadyToday
+                ? 'You have already checked in today'
+                : isPending
+                ? 'Waiting for wallet / transaction'
+                : 'Start your daily check-in'
+            }
           >
-            {alreadyToday ? 'Already checked in today' : 'Check in for Today'}
+            {alreadyToday
+              ? 'Already checked in today'
+              : isPending
+              ? 'Confirming…'
+              : 'Check in for Today'}
           </button>
         ) : (
           <div className="text-sm text-muted-foreground">Connect your wallet to check in.</div>
@@ -148,16 +187,15 @@ export default function Page() {
         </section>
       )}
 
-      {/* Progress */}
+      {/* Progress (only the generic 30-day streak for now; Mobility Month will have its own page) */}
       {isConnected && (
         <section className="rounded-2xl bg-card p-8 border border-white/10 shadow-card">
           <h3 className="text-xl font-semibold mb-2">Progress Towards Badges</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Track your overall streak and challenge milestones
+            Track your overall streak milestones.
           </p>
           <div className="space-y-4">
             <ProgressBar label="30-Day Streak" current={currentStreak} total={30} />
-            <ProgressBar label="Mobility Month" current={currentStreak} total={30} colorClass="bg-teal-500" />
           </div>
         </section>
       )}

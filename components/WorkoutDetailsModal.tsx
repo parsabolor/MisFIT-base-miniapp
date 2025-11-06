@@ -5,7 +5,7 @@ import type { CheckinMeta, Lowlight } from '@/lib/types'
 import { saveDraft, loadDraft, clearDraft } from '@/lib/storage'
 
 // ---------- helpers ----------
-const DEFAULT_CHIPS = ['Felt tired', 'No motivation', 'Injury', 'Too busy']
+const DEFAULT_CHIPS = ['Felt tired', 'No motivation', 'Injury', 'Too busy'] as const
 type RatingUnion = 0 | 1 | 2 | 3 | 4 | 5
 
 function formatToday() {
@@ -81,7 +81,7 @@ export function WorkoutDetailsModal({
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [rating, setRating] = useState<number | null>(null)
-  const [lowlight, setLowlight] = useState<Lowlight | undefined>(undefined)
+  const [lowlight, setLowlight] = useState<Lowlight & { notes?: string } | undefined>(undefined)
   const [saving, setSaving] = useState(false)
 
   const todayLabel = useMemo(() => formatToday(), [])
@@ -105,7 +105,7 @@ export function WorkoutDetailsModal({
       } else {
         setRating(null)
       }
-      if (d.lowlight) setLowlight(d.lowlight as any)
+      if (d.lowlight) setLowlight(d.lowlight as Lowlight & { notes?: string })
     }
     // reset to step 1 and focus title
     setStep(1)
@@ -161,7 +161,7 @@ export function WorkoutDetailsModal({
       title: title || undefined,
       description: description || undefined,
       rating: (rating ?? 3) as RatingUnion,
-      lowlight,
+      lowlight, // includes chips, coachFlag, notes (if present)
     })
     clearDraft(address)
     setSaving(false)
@@ -169,6 +169,22 @@ export function WorkoutDetailsModal({
   }
 
   if (!open) return null
+
+  // Safe helpers to update lowlight
+  const ensureLowlight = () =>
+    setLowlight((prev) => prev ?? { chips: [], coachFlag: false, notes: '' })
+
+  const toggleChip = (label: string) => {
+    setLowlight((prev) => {
+      const chipsSet = new Set(prev?.chips ?? [])
+      chipsSet.has(label) ? chipsSet.delete(label) : chipsSet.add(label)
+      return {
+        chips: Array.from(chipsSet),
+        coachFlag: prev?.coachFlag ?? false,
+        notes: prev?.notes ?? '',
+      }
+    })
+  }
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4">
@@ -214,7 +230,7 @@ export function WorkoutDetailsModal({
               <span className="mb-1 block text-sm text-neutral-300">What did you do?</span>
               <input
                 ref={titleRef}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-neutral-500 focus:border-white/20 focus:outline-none"
+                className="input"
                 placeholder="e.g., Mobility W1D3 — Hip Flow"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -224,7 +240,7 @@ export function WorkoutDetailsModal({
             <label className="block">
               <span className="mb-1 block text-sm text-neutral-300">Description</span>
               <textarea
-                className="w-full min-h-28 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-neutral-500 focus:border-white/20 focus:outline-none"
+                className="textarea"
                 placeholder="Deep dive, cues, how it felt…"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -232,8 +248,10 @@ export function WorkoutDetailsModal({
             </label>
 
             <div className="flex justify-end">
-              <button className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-                      onClick={() => setStep(2)}>
+              <button
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                onClick={() => setStep(2)}
+              >
                 Continue →
               </button>
             </div>
@@ -253,23 +271,27 @@ export function WorkoutDetailsModal({
             </div>
 
             <div className="flex justify-between">
-              <button className="rounded-xl border border-white/15 px-4 py-2 text-sm text-neutral-200 hover:bg-white/5"
-                      onClick={() => setStep(1)}>
+              <button
+                className="rounded-xl border border-white/15 px-4 py-2 text-sm text-neutral-200 hover:bg-white/5"
+                onClick={() => setStep(1)}
+              >
                 Back
               </button>
-              <button className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-                      onClick={goFromRating}>
+              <button
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                onClick={goFromRating}
+              >
                 {rating === null ? 'Skip →' : 'Continue →'}
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP 3: rough details */}
+        {/* STEP 3: rough details (when rating <= 1) */}
         {step === 3 && (
           <div className="space-y-5">
             <div>
-              <div className="mb-2 text-sm text-neutral-300">Rough day — anything specific?</div>
+              <div className="mb-2 text-sm text-neutral-300">Rough day — anything specific? (optional)</div>
               <div className="flex flex-wrap gap-2">
                 {DEFAULT_CHIPS.map((c) => {
                   const active = lowlight?.chips?.includes(c) ?? false
@@ -277,12 +299,15 @@ export function WorkoutDetailsModal({
                     <button
                       key={c}
                       type="button"
-                      className={`badge ${active ? 'border-misfit-red text-misfit-red' : ''}`}
-                      onClick={() => {
-                        const chips = new Set(lowlight?.chips || [])
-                        active ? chips.delete(c) : chips.add(c)
-                        setLowlight({ coachFlag: lowlight?.coachFlag ?? false, chips: Array.from(chips) })
-                      }}
+                      role="checkbox"
+                      aria-checked={active}
+                      className={[
+                        'rounded-full px-3.5 py-2 text-sm transition border',
+                        active
+                          ? 'bg-white/10 border-white/30 text-white'
+                          : 'bg-transparent border-white/15 text-neutral-300 hover:border-white/30 hover:text-white',
+                      ].join(' ')}
+                      onClick={() => toggleChip(c)}
                     >
                       {c}
                     </button>
@@ -291,24 +316,53 @@ export function WorkoutDetailsModal({
               </div>
             </div>
 
+            {/* Optional notes */}
+            <div className="space-y-2">
+              <label className="text-sm text-neutral-400">Add a note (optional)</label>
+              <textarea
+                className="textarea"
+                placeholder="Anything you’d like to add?"
+                value={lowlight?.notes ?? ''}
+                onChange={(e) => {
+                  ensureLowlight()
+                  setLowlight((prev) => ({
+                    chips: prev?.chips ?? [],
+                    coachFlag: prev?.coachFlag ?? false,
+                    notes: e.target.value,
+                  }))
+                }}
+                rows={3}
+              />
+            </div>
+
+            {/* Coach reach-out */}
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={lowlight?.coachFlag ?? false}
-                onChange={(e) =>
-                  setLowlight({ chips: lowlight?.chips || [], coachFlag: e.target.checked })
-                }
+                onChange={(e) => {
+                  ensureLowlight()
+                  setLowlight((prev) => ({
+                    chips: prev?.chips ?? [],
+                    coachFlag: e.target.checked,
+                    notes: prev?.notes ?? '',
+                  }))
+                }}
               />
               Would like coach to reach out
             </label>
 
             <div className="flex justify-between">
-              <button className="rounded-xl border border-white/15 px-4 py-2 text-sm text-neutral-200 hover:bg-white/5"
-                      onClick={() => setStep(2)}>
+              <button
+                className="rounded-xl border border-white/15 px-4 py-2 text-sm text-neutral-200 hover:bg-white/5"
+                onClick={() => setStep(2)}
+              >
                 Back
               </button>
-              <button className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-                      onClick={() => setStep(4)}>
+              <button
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                onClick={() => setStep(4)}
+              >
                 Continue →
               </button>
             </div>
@@ -325,21 +379,31 @@ export function WorkoutDetailsModal({
               <div><span className="text-neutral-500">Description:</span> {description || '—'}</div>
               <div><span className="text-neutral-500">Rating:</span> {rating ?? '—'}</div>
               {showRough && (
-                <div>
-                  <span className="text-neutral-500">Lowlight:</span>{' '}
-                  {(lowlight?.chips || []).join(', ') || '—'} {lowlight?.coachFlag ? '(coach reach-out)' : ''}
-                </div>
+                <>
+                  <div>
+                    <span className="text-neutral-500">Lowlight:</span>{' '}
+                    {(lowlight?.chips || []).join(', ') || '—'} {lowlight?.coachFlag ? '(coach reach-out)' : ''}
+                  </div>
+                  <div>
+                    <span className="text-neutral-500">Notes:</span>{' '}
+                    {lowlight?.notes?.trim() || '—'}
+                  </div>
+                </>
               )}
             </div>
 
             <div className="flex justify-between">
-              <button className="rounded-xl border border-white/15 px-4 py-2 text-sm text-neutral-200 hover:bg-white/5"
-                      onClick={() => setStep(showRough ? 3 : 2)}>
+              <button
+                className="rounded-xl border border-white/15 px-4 py-2 text-sm text-neutral-200 hover:bg-white/5"
+                onClick={() => setStep(showRough ? 3 : 2)}
+              >
                 Back
               </button>
-              <button className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-                      onClick={handleSubmit}
-                      disabled={saving}>
+              <button
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                onClick={handleSubmit}
+                disabled={saving}
+              >
                 {saving ? 'Saving…' : 'Submit'}
               </button>
             </div>
