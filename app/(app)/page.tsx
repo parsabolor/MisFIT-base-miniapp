@@ -11,7 +11,7 @@ import { WorkoutDetailsModal } from '@/components/WorkoutDetailsModal'
 import { addCheckin, getStats, setStats } from '@/lib/storage'
 import type { CheckinMeta } from '@/lib/types'
 
-// NEW: on-chain helpers
+// On-chain helpers
 import {
   useCheckedInToday,
   useCheckInWrite,
@@ -43,15 +43,17 @@ function readPseudonym(address?: string | null) {
 export default function Page() {
   const { address, isConnected } = useAccount()
 
-  // On-chain reads (used when available)
+  // On-chain reads (optional in UI; primary use is "already today" gate)
   const { data: todayOnchain } = useCheckedInToday(address as any)
   const { data: onchainStats } = useOnchainStats(address as any)
 
-  // Writer (on-chain check-in)
+  // On-chain writer
   const { checkIn, isPending } = useCheckInWrite()
 
   const [open, setOpen] = useState(false)
   const [pseudo, setPseudo] = useState('')
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null)
+
   const [stats, setLocalStats] = useState<Stats>({
     currentStreak: 0,
     bestStreak: 0,
@@ -67,31 +69,35 @@ export default function Page() {
     setPseudo(readPseudonym(address))
   }, [address])
 
-  // If you want to display on-chain stats instead of local, you could
-  // map them into the UI here. For now we keep local display and use
-  // chain only to gate the "already today" lockout.
+  // Local "already today" check
   const alreadyTodayLocal = useMemo(() => {
     if (!stats.lastCheckInDate) return false
     const last = new Date(stats.lastCheckInDate)
     return startOfUtcDay(last) === startOfUtcDay(new Date())
   }, [stats.lastCheckInDate])
 
-  // Prefer the chain flag when present
+  // Prefer on-chain flag when present
   const alreadyToday = (todayOnchain as boolean | undefined) ?? alreadyTodayLocal
 
-  // Submit: first do the on-chain minimal check-in, then save rich local details
+  // --- Submit flow: ON-CHAIN first, then ALWAYS do off-chain log ---
   async function submit(payload: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) {
     if (!address) return
+    setFallbackNotice(null)
 
-    // 1) On-chain tx (wallet pops). If user rejects or tx errors, stop.
+    // 1) Try on-chain (non-blocking for off-chain)
+    let onchainOk = false
     try {
       await checkIn()
+      onchainOk = true
+      // Optionally: you could re-read chain state here
+      // await refetchCheckedInToday()
+      // await refetchOnchainStats()
     } catch (e) {
-      console.error('checkIn failed or rejected', e)
-      return
+      console.warn('On-chain check-in failed or was rejected; falling back to local.', e)
+      setFallbackNotice('On-chain check-in was skipped — saved locally instead.')
     }
 
-    // 2) Keep your rich local log (hybrid approach)
+    // 2) Always save rich off-chain details so user never loses progress
     const nowIso = new Date().toISOString()
     const meta: CheckinMeta = {
       version: 'misfit-checkin-1',
@@ -101,7 +107,7 @@ export default function Page() {
     }
     addCheckin(address, meta)
 
-    // 3) Optimistic local streak update for immediate UX feedback
+    // 3) Optimistic local streak update
     const s = getStats(address)
     const last = s.lastCheckInDate ? new Date(s.lastCheckInDate) : null
     const lastDay = last ? startOfUtcDay(last) : null
@@ -173,6 +179,13 @@ export default function Page() {
         ) : (
           <div className="text-sm text-muted-foreground">Connect your wallet to check in.</div>
         )}
+
+        {/* Soft notice if we fell back */}
+        {!!fallbackNotice && (
+          <div className="mt-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+            {fallbackNotice}
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -187,7 +200,7 @@ export default function Page() {
         </section>
       )}
 
-      {/* Progress (only the generic 30-day streak for now; Mobility Month will have its own page) */}
+      {/* Progress (generic only; Mobility Month has its own flow) */}
       {isConnected && (
         <section className="rounded-2xl bg-card p-8 border border-white/10 shadow-card">
           <h3 className="text-xl font-semibold mb-2">Progress Towards Badges</h3>
