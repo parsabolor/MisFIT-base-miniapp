@@ -2,7 +2,8 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useAccount } from 'wagmi'
+import { useAccount, useChainId, useSwitchChain } from 'wagmi'
+import { baseSepolia } from 'wagmi/chains'
 
 import WalletConnect from '@/components/WalletConnect'
 import { StatsCard } from '@/components/StatsCard'
@@ -42,12 +43,15 @@ function readPseudonym(address?: string | null) {
 
 export default function Page() {
   const { address, isConnected } = useAccount()
+  const chainId = useChainId()
+  const { switchChain, isPending: isSwitching } = useSwitchChain()
 
-  // On-chain reads (optional in UI; primarily used for "already today" gate)
-  const { data: todayOnchain } = useCheckedInToday(address as any)
-  const { data: onchainStats } = useOnchainStats(address as any) // kept for future use
+  // On-chain reads (use today flag primarily to gate the CTA)
+  const { data: todayOnchain, refetch: refetchToday } = useCheckedInToday(address as any)
+  // Kept for future: on-chain totals
+  const { refetch: refetchOnchainStats } = useOnchainStats(address as any)
 
-  // On-chain writer (waits for confirmation)
+  // On-chain writer
   const { checkInAndWait, isPending } = useCheckInWrite()
 
   const [open, setOpen] = useState(false)
@@ -69,26 +73,27 @@ export default function Page() {
     setPseudo(readPseudonym(address))
   }, [address])
 
-  // Local "already today" check
+  // Local "already today" (fallback)
   const alreadyTodayLocal = useMemo(() => {
     if (!stats.lastCheckInDate) return false
     const last = new Date(stats.lastCheckInDate)
     return startOfUtcDay(last) === startOfUtcDay(new Date())
   }, [stats.lastCheckInDate])
 
-  // Prefer on-chain flag when present
+  // Prefer chain flag when present
   const alreadyToday = (todayOnchain as boolean | undefined) ?? alreadyTodayLocal
 
-  // --- Submit flow: ON-CHAIN first (wait), then OFF-CHAIN if success ---
+  const onWrongChain = isConnected && chainId !== undefined && chainId !== baseSepolia.id
+
+  // --- Submit: ON-CHAIN first, then OFF-CHAIN if success ---
   async function submit(payload: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) {
     if (!address) return
     setTxError(null)
 
-    // 1) On-chain wallet tx (blocking). If rejected/failed, keep modal open & stop.
+    // 1) On-chain (waits for confirmation). If rejected/failed, keep modal open & stop.
     try {
       await checkInAndWait()
     } catch (e: any) {
-      console.warn('On-chain check-in rejected/failed', e)
       const msg =
         e?.shortMessage ||
         e?.message ||
@@ -97,7 +102,13 @@ export default function Page() {
       return
     }
 
-    // 2) Save rich off-chain details (hybrid approach)
+    // 1b) Refresh on-chain “checked today” so CTA locks immediately
+    try {
+      await refetchToday?.()
+      await refetchOnchainStats?.()
+    } catch {}
+
+    // 2) Rich local log
     const nowIso = new Date().toISOString()
     const meta: CheckinMeta = {
       version: 'misfit-checkin-1',
@@ -107,7 +118,7 @@ export default function Page() {
     }
     addCheckin(address, meta)
 
-    // 3) Optimistic local streak update for immediate UX feedback
+    // 3) Optimistic local streak update
     const s = getStats(address)
     const last = s.lastCheckInDate ? new Date(s.lastCheckInDate) : null
     const lastDay = last ? startOfUtcDay(last) : null
@@ -139,7 +150,6 @@ export default function Page() {
         <img src="/logo.png" alt="MisFIT Logo" className="w-24 h-24 md:w-32 md:h-32" />
         <h1 className="text-4xl md:text-5xl font-bold">MisFIT Check-ins</h1>
 
-        {/* Welcome line if pseudonym set */}
         {pseudo && (
           <div className="text-sm text-neutral-300">
             Welcome, <span className="font-semibold">{pseudo}</span>
@@ -153,34 +163,48 @@ export default function Page() {
         <WalletConnect />
 
         {isConnected ? (
-          <button
-            onClick={() => setOpen(true)}
-            disabled={alreadyToday || isPending}
-            className={[
-              'mt-2 inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold transition',
-              alreadyToday || isPending
-                ? 'bg-primary/40 text-primary-foreground/70 cursor-not-allowed'
-                : 'bg-primary text-primary-foreground hover:opacity-90',
-            ].join(' ')}
-            title={
-              alreadyToday
-                ? 'You have already checked in today'
+          onWrongChain ? (
+            <button
+              onClick={() => switchChain({ chainId: baseSepolia.id })}
+              disabled={isSwitching}
+              className={[
+                'mt-2 inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold transition',
+                'bg-white/15 text-white hover:bg-white/20',
+                isSwitching && 'opacity-60 cursor-not-allowed',
+              ].join(' ')}
+              title="Switch to Base Sepolia (84532)"
+            >
+              {isSwitching ? 'Switching…' : 'Switch to Base Sepolia'}
+            </button>
+          ) : (
+            <button
+              onClick={() => setOpen(true)}
+              disabled={alreadyToday || isPending}
+              className={[
+                'mt-2 inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold transition',
+                alreadyToday || isPending
+                  ? 'bg-primary/40 text-primary-foreground/70 cursor-not-allowed'
+                  : 'bg-primary text-primary-foreground hover:opacity-90',
+              ].join(' ')}
+              title={
+                alreadyToday
+                  ? 'You have already checked in today'
+                  : isPending
+                  ? 'Waiting for wallet / transaction'
+                  : 'Start your daily check-in'
+              }
+            >
+              {alreadyToday
+                ? 'Already checked in today'
                 : isPending
-                ? 'Waiting for wallet / transaction'
-                : 'Start your daily check-in'
-            }
-          >
-            {alreadyToday
-              ? 'Already checked in today'
-              : isPending
-              ? 'Confirming…'
-              : 'Check in for Today'}
-          </button>
+                ? 'Confirming…'
+                : 'Check in for Today'}
+            </button>
+          )
         ) : (
           <div className="text-sm text-muted-foreground">Connect your wallet to check in.</div>
         )}
 
-        {/* Tx error (non-blocking, modal stays open so user can retry) */}
         {!!txError && (
           <div className="mt-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
             {txError}
@@ -214,7 +238,7 @@ export default function Page() {
       )}
 
       {/* Check-in Modal */}
-      {isConnected && address && (
+      {isConnected && address && !onWrongChain && (
         <WorkoutDetailsModal
           open={open}
           onClose={() => setOpen(false)}
