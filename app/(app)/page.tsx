@@ -43,16 +43,16 @@ function readPseudonym(address?: string | null) {
 export default function Page() {
   const { address, isConnected } = useAccount()
 
-  // On-chain reads (optional in UI; primary use is "already today" gate)
+  // On-chain reads (optional in UI; primarily used for "already today" gate)
   const { data: todayOnchain } = useCheckedInToday(address as any)
-  const { data: onchainStats } = useOnchainStats(address as any)
+  const { data: onchainStats } = useOnchainStats(address as any) // kept for future use
 
-  // On-chain writer
-  const { checkIn, isPending } = useCheckInWrite()
+  // On-chain writer (waits for confirmation)
+  const { checkInAndWait, isPending } = useCheckInWrite()
 
   const [open, setOpen] = useState(false)
   const [pseudo, setPseudo] = useState('')
-  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null)
+  const [txError, setTxError] = useState<string | null>(null)
 
   const [stats, setLocalStats] = useState<Stats>({
     currentStreak: 0,
@@ -79,25 +79,25 @@ export default function Page() {
   // Prefer on-chain flag when present
   const alreadyToday = (todayOnchain as boolean | undefined) ?? alreadyTodayLocal
 
-  // --- Submit flow: ON-CHAIN first, then ALWAYS do off-chain log ---
+  // --- Submit flow: ON-CHAIN first (wait), then OFF-CHAIN if success ---
   async function submit(payload: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) {
     if (!address) return
-    setFallbackNotice(null)
+    setTxError(null)
 
-    // 1) Try on-chain (non-blocking for off-chain)
-    let onchainOk = false
+    // 1) On-chain wallet tx (blocking). If rejected/failed, keep modal open & stop.
     try {
-      await checkIn()
-      onchainOk = true
-      // Optionally: you could re-read chain state here
-      // await refetchCheckedInToday()
-      // await refetchOnchainStats()
-    } catch (e) {
-      console.warn('On-chain check-in failed or was rejected; falling back to local.', e)
-      setFallbackNotice('On-chain check-in was skipped — saved locally instead.')
+      await checkInAndWait()
+    } catch (e: any) {
+      console.warn('On-chain check-in rejected/failed', e)
+      const msg =
+        e?.shortMessage ||
+        e?.message ||
+        'Transaction was rejected or failed. Try again.'
+      setTxError(msg)
+      return
     }
 
-    // 2) Always save rich off-chain details so user never loses progress
+    // 2) Save rich off-chain details (hybrid approach)
     const nowIso = new Date().toISOString()
     const meta: CheckinMeta = {
       version: 'misfit-checkin-1',
@@ -107,7 +107,7 @@ export default function Page() {
     }
     addCheckin(address, meta)
 
-    // 3) Optimistic local streak update
+    // 3) Optimistic local streak update for immediate UX feedback
     const s = getStats(address)
     const last = s.lastCheckInDate ? new Date(s.lastCheckInDate) : null
     const lastDay = last ? startOfUtcDay(last) : null
@@ -180,10 +180,10 @@ export default function Page() {
           <div className="text-sm text-muted-foreground">Connect your wallet to check in.</div>
         )}
 
-        {/* Soft notice if we fell back */}
-        {!!fallbackNotice && (
+        {/* Tx error (non-blocking, modal stays open so user can retry) */}
+        {!!txError && (
           <div className="mt-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
-            {fallbackNotice}
+            {txError}
           </div>
         )}
       </div>
