@@ -39,21 +39,21 @@ export function useCheckInWrite() {
   async function checkInAndWait() {
     if (!CHECKINS_ADDR) throw new Error('Contract address missing')
 
-    // Optional safety: ensure user is on Base Sepolia
+    // Safety: require Base Sepolia
     if (chainId && chainId !== baseSepolia.id) {
       const err: any = new Error('Wrong network')
       err.code = 'WRONG_NETWORK'
       throw err
     }
 
-    // 1) Prompt wallet & send
+    // ⬇️ Force the tx to Base Sepolia so the wallet doesn’t default to Ethereum
     const hash = await writeContractAsync({
+      chainId: baseSepolia.id,          // <<< important
       address: CHECKINS_ADDR,
       abi: MISFIT_CHECKINS_ABI,
       functionName: 'checkIn',
     })
 
-    // 2) Wait for on-chain confirmation before resolving
     await waitForTransactionReceipt(wagmiConfig, { hash })
     return hash
   }
