@@ -1,17 +1,26 @@
+// app/(app)/page.tsx
 'use client'
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount, useChainId } from 'wagmi'
+import { useChainModal } from '@rainbow-me/rainbowkit'
 import { baseSepolia } from 'wagmi/chains'
 
 import WalletConnect from '@/components/WalletConnect'
+import ChainSwitch from '@/components/ChainSwitch'
 import { StatsCard } from '@/components/StatsCard'
 import { ProgressBar } from '@/components/ProgressBar'
 import { WorkoutDetailsModal } from '@/components/WorkoutDetailsModal'
 import { addCheckin, getStats, setStats } from '@/lib/storage'
 import type { CheckinMeta } from '@/lib/types'
-import { useCheckedInToday, useCheckInWrite, useOnchainStats } from '@/lib/chain/checkins'
+
+// On-chain helpers
+import {
+  useCheckedInToday,
+  useCheckInWrite,
+  useOnchainStats,
+} from '@/lib/chain/checkins'
 
 type Stats = {
   currentStreak: number
@@ -23,22 +32,28 @@ type Stats = {
 function startOfUtcDay(d: Date) {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
 }
+
 function readPseudonym(address?: string | null) {
   if (!address) return ''
   try {
     const raw = localStorage.getItem(`misfit-profile-${address}`)
     const obj = raw ? JSON.parse(raw) : null
     return obj?.pseudonym || ''
-  } catch { return '' }
+  } catch {
+    return ''
+  }
 }
 
 export default function Page() {
   const { address, isConnected } = useAccount()
   const chainId = useChainId()
-  const onWrongChain = isConnected && chainId !== undefined && chainId !== baseSepolia.id
+  const { openChainModal } = useChainModal()
 
-  const { data: todayOnchain, refetch: refetchToday } = useCheckedInToday(address as any)
-  const { refetch: refetchOnchainStats } = useOnchainStats(address as any)
+  // On-chain reads (optional UI)
+  const { data: todayOnchain } = useCheckedInToday(address as any)
+  useOnchainStats(address as any) // kept for future use
+
+  // On-chain writer (waits for confirmation)
   const { checkInAndWait, isPending } = useCheckInWrite()
 
   const [open, setOpen] = useState(false)
@@ -46,9 +61,13 @@ export default function Page() {
   const [txError, setTxError] = useState<string | null>(null)
 
   const [stats, setLocalStats] = useState<Stats>({
-    currentStreak: 0, bestStreak: 0, totalCheckIns: 0, lastCheckInDate: null,
+    currentStreak: 0,
+    bestStreak: 0,
+    totalCheckIns: 0,
+    lastCheckInDate: null,
   })
 
+  // Hydrate local snapshot + pseudonym
   useEffect(() => {
     if (!address) return
     const s = getStats(address)
@@ -56,40 +75,87 @@ export default function Page() {
     setPseudo(readPseudonym(address))
   }, [address])
 
+  // Local "already today" check
   const alreadyTodayLocal = useMemo(() => {
     if (!stats.lastCheckInDate) return false
     const last = new Date(stats.lastCheckInDate)
     return startOfUtcDay(last) === startOfUtcDay(new Date())
   }, [stats.lastCheckInDate])
 
+  // Prefer on-chain flag when present
   const alreadyToday = (todayOnchain as boolean | undefined) ?? alreadyTodayLocal
 
+  // Gate: ensure we are on Base Sepolia before opening the check-in modal
+  async function ensureBaseSepoliaOrPrompt(): Promise<boolean> {
+    if (chainId === baseSepolia.id) return true
+    // open RainbowKit chain switcher and let the user choose Base Sepolia
+    await openChainModal?.()
+    // After the modal closes, wagmi will emit chain change; give React a tick
+    await new Promise((r) => setTimeout(r, 150))
+    return (window as any)?.ethereum // best-effort re-check
+      ? (Number((window as any).ethereum.chainId) === baseSepolia.id ||
+         (window as any).ethereum.chainId === '0x14a34')
+      : false
+  }
+
+  // Open modal (preflight network)
+  async function handleOpen() {
+    setTxError(null)
+    if (!(await ensureBaseSepoliaOrPrompt())) return
+    setOpen(true)
+  }
+
+  // --- Submit flow: ON-CHAIN first (wait), then OFF-CHAIN if success ---
   async function submit(payload: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) {
     if (!address) return
     setTxError(null)
+
+    // Preflight network again (in case user switched back)
+    if (!(await ensureBaseSepoliaOrPrompt())) {
+      setTxError('Please switch to Base Sepolia (84532) to check in.')
+      return
+    }
+
+    // 1) On-chain wallet tx (blocking). If rejected/failed, keep modal open & stop.
     try {
       await checkInAndWait()
     } catch (e: any) {
-      setTxError(e?.shortMessage || e?.message || 'Transaction was rejected or failed. Try again.')
+      const msg =
+        e?.shortMessage ||
+        e?.message ||
+        'Transaction was rejected or failed. Try again.'
+      setTxError(msg)
       return
     }
-    try { await refetchToday?.(); await refetchOnchainStats?.() } catch {}
 
+    // 2) Save rich off-chain details (hybrid)
     const nowIso = new Date().toISOString()
-    const meta: CheckinMeta = { version: 'misfit-checkin-1', userId: address, checkinAt: nowIso, ...payload }
+    const meta: CheckinMeta = {
+      version: 'misfit-checkin-1',
+      userId: address,
+      checkinAt: nowIso,
+      ...payload,
+    }
     addCheckin(address, meta)
 
+    // 3) Optimistic local streak update
     const s = getStats(address)
     const last = s.lastCheckInDate ? new Date(s.lastCheckInDate) : null
     const lastDay = last ? startOfUtcDay(last) : null
     const todayDay = startOfUtcDay(new Date(nowIso))
     const isDup = lastDay === todayDay
+
     if (!isDup) {
-      s.currentStreak = last && todayDay - (lastDay as number) === 86400000 ? s.currentStreak + 1 : 1
+      if (last && todayDay - (lastDay as number) === 24 * 60 * 60 * 1000) {
+        s.currentStreak += 1
+      } else {
+        s.currentStreak = 1
+      }
       s.bestStreak = Math.max(s.bestStreak, s.currentStreak)
       s.totalCheckIns += 1
       s.lastCheckInDate = nowIso
     }
+
     setStats(address, s)
     setLocalStats(s)
     setOpen(false)
@@ -99,10 +165,12 @@ export default function Page() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 md:py-14 space-y-12">
+      {/* Header */}
       <div className="flex flex-col items-center gap-4 text-center">
         <img src="/logo.png" alt="MisFIT Logo" className="w-24 h-24 md:w-32 md:h-32" />
         <h1 className="text-4xl md:text-5xl font-bold">MisFIT Check-ins</h1>
 
+        {/* Welcome line if pseudonym set */}
         {pseudo && (
           <div className="text-sm text-neutral-300">
             Welcome, <span className="font-semibold">{pseudo}</span>
@@ -113,31 +181,32 @@ export default function Page() {
           Track your daily check-ins and build unstoppable streaks
         </p>
 
-        <WalletConnect />
+        {/* Wallet & Chain controls */}
+        <div className="flex items-center gap-2">
+          <WalletConnect />
+          <ChainSwitch />
+        </div>
 
+        {/* Primary CTA */}
         {isConnected ? (
           <button
-            onClick={() => setOpen(true)}
-            disabled={onWrongChain || alreadyToday || isPending}
+            onClick={handleOpen}
+            disabled={alreadyToday || isPending}
             className={[
               'mt-2 inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold transition',
-              onWrongChain || alreadyToday || isPending
+              alreadyToday || isPending
                 ? 'bg-primary/40 text-primary-foreground/70 cursor-not-allowed'
                 : 'bg-primary text-primary-foreground hover:opacity-90',
             ].join(' ')}
             title={
-              onWrongChain
-                ? 'Switch to Base Sepolia to check in'
-                : alreadyToday
+              alreadyToday
                 ? 'You have already checked in today'
                 : isPending
                 ? 'Waiting for wallet / transaction'
                 : 'Start your daily check-in'
             }
           >
-            {onWrongChain
-              ? 'Wrong network'
-              : alreadyToday
+            {alreadyToday
               ? 'Already checked in today'
               : isPending
               ? 'Confirming…'
@@ -147,6 +216,7 @@ export default function Page() {
           <div className="text-sm text-muted-foreground">Connect your wallet to check in.</div>
         )}
 
+        {/* Tx / network error */}
         {!!txError && (
           <div className="mt-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
             {txError}
@@ -154,6 +224,7 @@ export default function Page() {
         )}
       </div>
 
+      {/* Stats */}
       {isConnected && (
         <section>
           <h2 className="text-2xl font-semibold mb-6">Your Stats</h2>
@@ -165,6 +236,7 @@ export default function Page() {
         </section>
       )}
 
+      {/* Progress */}
       {isConnected && (
         <section className="rounded-2xl bg-card p-8 border border-white/10 shadow-card">
           <h3 className="text-xl font-semibold mb-2">Progress Towards Badges</h3>
@@ -177,7 +249,8 @@ export default function Page() {
         </section>
       )}
 
-      {isConnected && address && !onWrongChain && (
+      {/* Check-in Modal */}
+      {isConnected && address && (
         <WorkoutDetailsModal
           open={open}
           onClose={() => setOpen(false)}
