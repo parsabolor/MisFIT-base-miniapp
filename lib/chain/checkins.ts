@@ -1,8 +1,7 @@
-// lib/chain/checkins.ts
 'use client'
 
 import type { Address } from 'viem'
-import { useAccount, useReadContract, useWriteContract } from 'wagmi'
+import { useReadContract, useWriteContract, useAccount } from 'wagmi'
 import { waitForTransactionReceipt } from '@wagmi/core'
 import { baseSepolia } from 'wagmi/chains'
 
@@ -32,46 +31,38 @@ export function useCheckedInToday(address?: Address) {
   })
 }
 
-// ---------- WRITE (forces Base Sepolia + waits for confirmation) ----------
+// ---------- WRITES ----------
 export function useCheckInWrite() {
   const { chainId } = useAccount()
   const { writeContractAsync, isPending } = useWriteContract()
 
-  async function checkInAndWait() {
-    if (!CHECKINS_ADDR) {
-      const err: any = new Error('Missing NEXT_PUBLIC_CHECKINS_ADDRESS')
-      err.code = 'CONFIG_MISSING'
-      throw err
-    }
-
+  // Strict version: throws if wrong chain, waits for confirmation, returns tx hash
+  async function checkInAndWait(): Promise<`0x${string}`> {
+    if (!CHECKINS_ADDR) throw new Error('Contract address missing')
     if (chainId && chainId !== baseSepolia.id) {
-      const err: any = new Error(`Wrong network: ${chainId}. Please switch to Base Sepolia (84532).`)
+      const err: any = new Error('Wrong network')
       err.code = 'WRONG_NETWORK'
       throw err
     }
-
-    // Force the tx to Base Sepolia so the wallet doesn’t default to Ethereum
-    let hash: `0x${string}`
-    try {
-      hash = await writeContractAsync({
-        chainId: baseSepolia.id,
-        address: CHECKINS_ADDR,
-        abi: MISFIT_CHECKINS_ABI,
-        functionName: 'checkIn',
-      })
-    } catch (e: any) {
-      // Common wallet errors surface here (user reject, bad address, etc.)
-      throw e
-    }
-
-    try {
-      await waitForTransactionReceipt(wagmiConfig, { hash })
-    } catch (e: any) {
-      // RPC “resource not found” or similar confirmation issues surface here
-      throw e
-    }
+    const hash = await writeContractAsync({
+      chainId: baseSepolia.id,
+      address: CHECKINS_ADDR,
+      abi: MISFIT_CHECKINS_ABI,
+      functionName: 'checkIn',
+    })
+    await waitForTransactionReceipt(wagmiConfig, { hash })
     return hash
   }
 
-  return { checkInAndWait, isPending }
+  // Soft version: tries on-chain, never throws; returns true if mined, false otherwise
+  async function tryOnchainCheckIn(): Promise<boolean> {
+    try {
+      await checkInAndWait()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  return { checkInAndWait, tryOnchainCheckIn, isPending }
 }
