@@ -1,12 +1,9 @@
 'use client'
 
 import type { Address } from 'viem'
-import { useReadContract, useWriteContract, useAccount } from 'wagmi'
-import { waitForTransactionReceipt } from '@wagmi/core'
+import { useReadContract, useWriteContract, useAccount, usePublicClient } from 'wagmi'
 import { baseSepolia } from 'wagmi/chains'
-
 import { MISFIT_CHECKINS_ABI } from '@/contracts/abi/misfitCheckins'
-import { wagmiConfig } from '@/providers/WagmiProvider'
 
 export const CHECKINS_ADDR = (process.env.NEXT_PUBLIC_CHECKINS_ADDRESS || '') as Address
 
@@ -31,30 +28,33 @@ export function useCheckedInToday(address?: Address) {
   })
 }
 
-// ----- WRITE (waits for confirmation) -----
+// ----- WRITE (waits for confirmation on Base Sepolia public client) -----
 export function useCheckInWrite() {
   const { chainId } = useAccount()
   const { writeContractAsync, isPending } = useWriteContract()
+  const publicClient = usePublicClient({ chainId: baseSepolia.id })
 
   async function checkInAndWait() {
     if (!CHECKINS_ADDR) throw new Error('Contract address missing')
 
-    // Safety: require Base Sepolia
-    if (chainId && chainId !== baseSepolia.id) {
+    // Require Base Sepolia at time of write
+    if (chainId !== baseSepolia.id) {
       const err: any = new Error('Wrong network')
       err.code = 'WRONG_NETWORK'
       throw err
     }
 
-    // ⬇️ Force the tx to Base Sepolia so the wallet doesn’t default to Ethereum
+    // Send on Base Sepolia explicitly to avoid wallets defaulting to Ethereum
     const hash = await writeContractAsync({
-      chainId: baseSepolia.id,          // <<< important
+      chainId: baseSepolia.id,
       address: CHECKINS_ADDR,
       abi: MISFIT_CHECKINS_ABI,
       functionName: 'checkIn',
     })
 
-    await waitForTransactionReceipt(wagmiConfig, { hash })
+    // Wait on the Base Sepolia-bound public client
+    // (prevents "requested resource not found" from mismatched RPCs)
+    await publicClient!.waitForTransactionReceipt({ hash })
     return hash
   }
 
