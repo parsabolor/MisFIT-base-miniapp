@@ -3,22 +3,19 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useAccount, useChainId } from 'wagmi'
-import { useChainModal } from '@rainbow-me/rainbowkit'
-import { baseSepolia } from 'wagmi/chains'
+import { useAccount } from 'wagmi'
 
 import WalletConnect from '@/components/WalletConnect'
-import ChainSwitch from '@/components/ChainSwitch'
 import { StatsCard } from '@/components/StatsCard'
 import { ProgressBar } from '@/components/ProgressBar'
 import { WorkoutDetailsModal } from '@/components/WorkoutDetailsModal'
 import { addCheckin, getStats, setStats } from '@/lib/storage'
 import type { CheckinMeta } from '@/lib/types'
 
-// On-chain helpers
+// On-chain helpers (hybrid flow)
 import {
   useCheckedInToday,
-  useCheckInWrite,
+  useCheckInWrite,    // exposes tryOnchainCheckIn, isPending
   useOnchainStats,
 } from '@/lib/chain/checkins'
 
@@ -46,19 +43,17 @@ function readPseudonym(address?: string | null) {
 
 export default function Page() {
   const { address, isConnected } = useAccount()
-  const chainId = useChainId()
-  const { openChainModal } = useChainModal()
 
-  // On-chain reads (optional UI)
+  // Optional reads (we mainly use on-chain flag to gate same-day)
   const { data: todayOnchain } = useCheckedInToday(address as any)
-  useOnchainStats(address as any) // kept for future use
+  useOnchainStats(address as any) // reserved for future display
 
-  // On-chain writer (waits for confirmation)
-  const { checkInAndWait, isPending } = useCheckInWrite()
+  // Writer: attempt on-chain, but never block UX
+  const { tryOnchainCheckIn, isPending } = useCheckInWrite()
 
   const [open, setOpen] = useState(false)
   const [pseudo, setPseudo] = useState('')
-  const [txError, setTxError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const [stats, setLocalStats] = useState<Stats>({
     currentStreak: 0,
@@ -85,50 +80,24 @@ export default function Page() {
   // Prefer on-chain flag when present
   const alreadyToday = (todayOnchain as boolean | undefined) ?? alreadyTodayLocal
 
-  // Gate: ensure we are on Base Sepolia before opening the check-in modal
-  async function ensureBaseSepoliaOrPrompt(): Promise<boolean> {
-    if (chainId === baseSepolia.id) return true
-    // open RainbowKit chain switcher and let the user choose Base Sepolia
-    await openChainModal?.()
-    // After the modal closes, wagmi will emit chain change; give React a tick
-    await new Promise((r) => setTimeout(r, 150))
-    return (window as any)?.ethereum // best-effort re-check
-      ? (Number((window as any).ethereum.chainId) === baseSepolia.id ||
-         (window as any).ethereum.chainId === '0x14a34')
-      : false
-  }
-
-  // Open modal (preflight network)
-  async function handleOpen() {
-    setTxError(null)
-    if (!(await ensureBaseSepoliaOrPrompt())) return
+  // Open modal
+  function handleOpen() {
+    setNotice(null)
     setOpen(true)
   }
 
-  // --- Submit flow: ON-CHAIN first (wait), then OFF-CHAIN if success ---
+  // --- Submit: try on-chain (best-effort) -> ALWAYS save locally ---
   async function submit(payload: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) {
     if (!address) return
-    setTxError(null)
+    setNotice(null)
 
-    // Preflight network again (in case user switched back)
-    if (!(await ensureBaseSepoliaOrPrompt())) {
-      setTxError('Please switch to Base Sepolia (84532) to check in.')
-      return
+    // 1) Best-effort on-chain write (wallet may prompt to switch/add chain)
+    const result = await tryOnchainCheckIn()
+    if (!result.ok) {
+      setNotice('Saved locally. On-chain check-in was skipped (you can switch to Base Sepolia any time).')
     }
 
-    // 1) On-chain wallet tx (blocking). If rejected/failed, keep modal open & stop.
-    try {
-      await checkInAndWait()
-    } catch (e: any) {
-      const msg =
-        e?.shortMessage ||
-        e?.message ||
-        'Transaction was rejected or failed. Try again.'
-      setTxError(msg)
-      return
-    }
-
-    // 2) Save rich off-chain details (hybrid)
+    // 2) Always save rich off-chain details
     const nowIso = new Date().toISOString()
     const meta: CheckinMeta = {
       version: 'misfit-checkin-1',
@@ -181,11 +150,8 @@ export default function Page() {
           Track your daily check-ins and build unstoppable streaks
         </p>
 
-        {/* Wallet & Chain controls */}
-        <div className="flex items-center gap-2">
-          <WalletConnect />
-          <ChainSwitch />
-        </div>
+        {/* Wallet only (no extra chain UI) */}
+        <WalletConnect />
 
         {/* Primary CTA */}
         {isConnected ? (
@@ -216,10 +182,10 @@ export default function Page() {
           <div className="text-sm text-muted-foreground">Connect your wallet to check in.</div>
         )}
 
-        {/* Tx / network error */}
-        {!!txError && (
+        {/* Soft notice if we fell back */}
+        {!!notice && (
           <div className="mt-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
-            {txError}
+            {notice}
           </div>
         )}
       </div>
