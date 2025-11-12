@@ -1,3 +1,4 @@
+// app/(app)/page.tsx
 'use client'
 export const dynamic = 'force-dynamic'
 
@@ -11,10 +12,10 @@ import { WorkoutDetailsModal } from '@/components/WorkoutDetailsModal'
 import { addCheckin, getStats, setStats } from '@/lib/storage'
 import type { CheckinMeta } from '@/lib/types'
 
-// NEW: on-chain helpers
+// On-chain helpers (hybrid flow)
 import {
   useCheckedInToday,
-  useCheckInWrite,
+  useCheckInWrite,    // exposes tryOnchainCheckIn, isPending
   useOnchainStats,
 } from '@/lib/chain/checkins'
 
@@ -43,15 +44,17 @@ function readPseudonym(address?: string | null) {
 export default function Page() {
   const { address, isConnected } = useAccount()
 
-  // On-chain reads (used when available)
+  // Optional reads (we mainly use on-chain flag to gate same-day)
   const { data: todayOnchain } = useCheckedInToday(address as any)
-  const { data: onchainStats } = useOnchainStats(address as any)
+  useOnchainStats(address as any) // reserved for future display
 
-  // Writer (on-chain check-in)
-  const { checkIn, isPending } = useCheckInWrite()
+  // Writer: attempt on-chain, but never block UX
+  const { tryOnchainCheckIn, isPending } = useCheckInWrite()
 
   const [open, setOpen] = useState(false)
   const [pseudo, setPseudo] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
+
   const [stats, setLocalStats] = useState<Stats>({
     currentStreak: 0,
     bestStreak: 0,
@@ -67,31 +70,34 @@ export default function Page() {
     setPseudo(readPseudonym(address))
   }, [address])
 
-  // If you want to display on-chain stats instead of local, you could
-  // map them into the UI here. For now we keep local display and use
-  // chain only to gate the "already today" lockout.
+  // Local "already today" check
   const alreadyTodayLocal = useMemo(() => {
     if (!stats.lastCheckInDate) return false
     const last = new Date(stats.lastCheckInDate)
     return startOfUtcDay(last) === startOfUtcDay(new Date())
   }, [stats.lastCheckInDate])
 
-  // Prefer the chain flag when present
+  // Prefer on-chain flag when present
   const alreadyToday = (todayOnchain as boolean | undefined) ?? alreadyTodayLocal
 
-  // Submit: first do the on-chain minimal check-in, then save rich local details
+  // Open modal
+  function handleOpen() {
+    setNotice(null)
+    setOpen(true)
+  }
+
+  // --- Submit: try on-chain (best-effort) -> ALWAYS save locally ---
   async function submit(payload: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) {
     if (!address) return
+    setNotice(null)
 
-    // 1) On-chain tx (wallet pops). If user rejects or tx errors, stop.
-    try {
-      await checkIn()
-    } catch (e) {
-      console.error('checkIn failed or rejected', e)
-      return
+    // 1) Best-effort on-chain write (wallet may prompt to switch/add chain)
+    const result = await tryOnchainCheckIn()
+    if (!result.ok) {
+      setNotice('Saved locally. On-chain check-in was skipped (you can switch to Base Sepolia any time).')
     }
 
-    // 2) Keep your rich local log (hybrid approach)
+    // 2) Always save rich off-chain details
     const nowIso = new Date().toISOString()
     const meta: CheckinMeta = {
       version: 'misfit-checkin-1',
@@ -101,7 +107,7 @@ export default function Page() {
     }
     addCheckin(address, meta)
 
-    // 3) Optimistic local streak update for immediate UX feedback
+    // 3) Optimistic local streak update
     const s = getStats(address)
     const last = s.lastCheckInDate ? new Date(s.lastCheckInDate) : null
     const lastDay = last ? startOfUtcDay(last) : null
@@ -144,11 +150,13 @@ export default function Page() {
           Track your daily check-ins and build unstoppable streaks
         </p>
 
+        {/* Wallet only (no extra chain UI) */}
         <WalletConnect />
 
+        {/* Primary CTA */}
         {isConnected ? (
           <button
-            onClick={() => setOpen(true)}
+            onClick={handleOpen}
             disabled={alreadyToday || isPending}
             className={[
               'mt-2 inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold transition',
@@ -173,6 +181,13 @@ export default function Page() {
         ) : (
           <div className="text-sm text-muted-foreground">Connect your wallet to check in.</div>
         )}
+
+        {/* Soft notice if we fell back */}
+        {!!notice && (
+          <div className="mt-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+            {notice}
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -187,7 +202,7 @@ export default function Page() {
         </section>
       )}
 
-      {/* Progress (only the generic 30-day streak for now; Mobility Month will have its own page) */}
+      {/* Progress */}
       {isConnected && (
         <section className="rounded-2xl bg-card p-8 border border-white/10 shadow-card">
           <h3 className="text-xl font-semibold mb-2">Progress Towards Badges</h3>

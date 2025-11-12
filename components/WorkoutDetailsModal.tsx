@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { CheckinMeta, Lowlight } from '@/lib/types'
 import { saveDraft, loadDraft, clearDraft } from '@/lib/storage'
 
-// ---------- helpers ----------
 const DEFAULT_CHIPS = ['Felt tired', 'No motivation', 'Injury', 'Too busy'] as const
 type RatingUnion = 0 | 1 | 2 | 3 | 4 | 5
 
@@ -21,7 +20,6 @@ function formatToday() {
   }
 }
 
-// inline rating row (no external deps)
 function RatingRow({
   value,
   onChange,
@@ -75,45 +73,36 @@ export function WorkoutDetailsModal({
   onClose: () => void
   address: string
   onSubmit: (meta: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) => Promise<void>
-}) {
-  // Steps: 1 = details, 2 = rating, 3 = rough (rating<=1), 4 = review
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+}): null | React.ReactElement {
+  // Strict 3-step flow
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [rating, setRating] = useState<number | null>(null)
-  const [lowlight, setLowlight] = useState<Lowlight & { notes?: string } | undefined>(undefined)
+  const [lowlight, setLowlight] = useState<(Lowlight & { note?: string }) | undefined>(undefined)
   const [saving, setSaving] = useState(false)
 
+  const totalSteps = 3
+  const pct = useMemo(() => (step / totalSteps) * 100, [step])
   const todayLabel = useMemo(() => formatToday(), [])
-  const showRough = rating !== null && rating <= 1
-  const totalSteps = showRough ? 4 : 3
-  const pct = useMemo(() => (step / totalSteps) * 100, [step, totalSteps])
 
-  // focus management
   const titleRef = useRef<HTMLInputElement | null>(null)
 
-  // open/close lifecycle
   useEffect(() => {
     if (!open) return
-    // load draft
     const d = loadDraft(address)
     if (d) {
       if (typeof d.title === 'string') setTitle(d.title)
       if (typeof d.description === 'string') setDescription(d.description)
-      if (typeof d.rating === 'number' && d.rating >= 0 && d.rating <= 5) {
-        setRating(d.rating)
-      } else {
-        setRating(null)
-      }
-      if (d.lowlight) setLowlight(d.lowlight as Lowlight & { notes?: string })
+      if (typeof d.rating === 'number' && d.rating >= 0 && d.rating <= 5) setRating(d.rating)
+      if (d.lowlight) setLowlight(d.lowlight as any)
     }
-    // reset to step 1 and focus title
     setStep(1)
-    const t = setTimeout(() => titleRef.current?.focus(), 50)
+    const t = setTimeout(() => titleRef.current?.focus(), 40)
     return () => clearTimeout(t)
   }, [open, address])
 
-  // autosave every 1.5s
   useEffect(() => {
     if (!open) return
     const id = setInterval(() => {
@@ -123,7 +112,6 @@ export function WorkoutDetailsModal({
     return () => clearInterval(id)
   }, [open, address, title, description, rating, lowlight])
 
-  // Esc to close
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -133,7 +121,6 @@ export function WorkoutDetailsModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  // Enter to continue on Step 1 (unless Shift or inside textarea)
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
@@ -150,10 +137,7 @@ export function WorkoutDetailsModal({
     return () => window.removeEventListener('keydown', handler)
   }, [open, step])
 
-  const goFromRating = () => {
-    if (rating === null) setStep(4) // skip to review
-    else setStep(rating <= 1 ? 3 : 4)
-  }
+  const goFromRating = () => setStep(3)
 
   const handleSubmit = async () => {
     setSaving(true)
@@ -161,7 +145,7 @@ export function WorkoutDetailsModal({
       title: title || undefined,
       description: description || undefined,
       rating: (rating ?? 3) as RatingUnion,
-      lowlight, // includes chips, coachFlag, notes (if present)
+      lowlight,
     })
     clearDraft(address)
     setSaving(false)
@@ -170,25 +154,9 @@ export function WorkoutDetailsModal({
 
   if (!open) return null
 
-  // Safe helpers to update lowlight
-  const ensureLowlight = () =>
-    setLowlight((prev) => prev ?? { chips: [], coachFlag: false, notes: '' })
-
-  const toggleChip = (label: string) => {
-    setLowlight((prev) => {
-      const chipsSet = new Set(prev?.chips ?? [])
-      chipsSet.has(label) ? chipsSet.delete(label) : chipsSet.add(label)
-      return {
-        chips: Array.from(chipsSet),
-        coachFlag: prev?.coachFlag ?? false,
-        notes: prev?.notes ?? '',
-      }
-    })
-  }
-
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4">
-      {/* overlay (click to close) */}
+      {/* overlay */}
       <button
         aria-label="Close"
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -223,14 +191,14 @@ export function WorkoutDetailsModal({
           />
         </div>
 
-        {/* STEP 1: details */}
+        {/* STEP 1: Details */}
         {step === 1 && (
           <div className="space-y-5">
             <label className="block">
               <span className="mb-1 block text-sm text-neutral-300">What did you do?</span>
               <input
                 ref={titleRef}
-                className="input"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-neutral-500 focus:border-white/20 focus:outline-none"
                 placeholder="e.g., Mobility W1D3 — Hip Flow"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -240,8 +208,8 @@ export function WorkoutDetailsModal({
             <label className="block">
               <span className="mb-1 block text-sm text-neutral-300">Description</span>
               <textarea
-                className="textarea"
-                placeholder="Deep dive, cues, how it felt…"
+                className="w-full min-h-28 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-neutral-500 focus:border-white/20 focus:outline-none"
+                placeholder="Notes, cues, how it felt… (optional)"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
@@ -258,15 +226,19 @@ export function WorkoutDetailsModal({
           </div>
         )}
 
-        {/* STEP 2: rating */}
+        {/* STEP 2: Rating */}
         {step === 2 && (
           <div className="space-y-5">
             <div>
               <div className="mb-1 text-base font-medium">How did it feel?</div>
-              <div className="mb-3 text-sm text-neutral-400">Rate your overall experience (optional)</div>
+              <div className="mb-3 text-sm text-neutral-400">
+                Rate your overall experience (optional)
+              </div>
               <RatingRow value={rating} onChange={setRating} />
               <div className="mt-2 text-xs text-neutral-500">
-                {rating === null ? 'You can skip rating and continue.' : 'You can change this before submitting.'}
+                {rating === null
+                  ? 'You can skip rating and continue.'
+                  : 'You can change this before submitting.'}
               </div>
             </div>
 
@@ -287,90 +259,8 @@ export function WorkoutDetailsModal({
           </div>
         )}
 
-        {/* STEP 3: rough details (when rating <= 1) */}
+        {/* STEP 3: Review (+ rough day if rating ≤ 1) */}
         {step === 3 && (
-          <div className="space-y-5">
-            <div>
-              <div className="mb-2 text-sm text-neutral-300">Rough day — anything specific? (optional)</div>
-              <div className="flex flex-wrap gap-2">
-                {DEFAULT_CHIPS.map((c) => {
-                  const active = lowlight?.chips?.includes(c) ?? false
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      role="checkbox"
-                      aria-checked={active}
-                      className={[
-                        'rounded-full px-3.5 py-2 text-sm transition border',
-                        active
-                          ? 'bg-white/10 border-white/30 text-white'
-                          : 'bg-transparent border-white/15 text-neutral-300 hover:border-white/30 hover:text-white',
-                      ].join(' ')}
-                      onClick={() => toggleChip(c)}
-                    >
-                      {c}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Optional notes */}
-            <div className="space-y-2">
-              <label className="text-sm text-neutral-400">Add a note (optional)</label>
-              <textarea
-                className="textarea"
-                placeholder="Anything you’d like to add?"
-                value={lowlight?.notes ?? ''}
-                onChange={(e) => {
-                  ensureLowlight()
-                  setLowlight((prev) => ({
-                    chips: prev?.chips ?? [],
-                    coachFlag: prev?.coachFlag ?? false,
-                    notes: e.target.value,
-                  }))
-                }}
-                rows={3}
-              />
-            </div>
-
-            {/* Coach reach-out */}
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={lowlight?.coachFlag ?? false}
-                onChange={(e) => {
-                  ensureLowlight()
-                  setLowlight((prev) => ({
-                    chips: prev?.chips ?? [],
-                    coachFlag: e.target.checked,
-                    notes: prev?.notes ?? '',
-                  }))
-                }}
-              />
-              Would like coach to reach out
-            </label>
-
-            <div className="flex justify-between">
-              <button
-                className="rounded-xl border border-white/15 px-4 py-2 text-sm text-neutral-200 hover:bg-white/5"
-                onClick={() => setStep(2)}
-              >
-                Back
-              </button>
-              <button
-                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-                onClick={() => setStep(4)}
-              >
-                Continue →
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 4: review */}
-        {step === 4 && (
           <div className="space-y-5">
             <div className="text-sm text-neutral-400">Review</div>
             <div className="space-y-1 text-sm">
@@ -378,24 +268,75 @@ export function WorkoutDetailsModal({
               <div><span className="text-neutral-500">Title:</span> {title || '—'}</div>
               <div><span className="text-neutral-500">Description:</span> {description || '—'}</div>
               <div><span className="text-neutral-500">Rating:</span> {rating ?? '—'}</div>
-              {showRough && (
-                <>
-                  <div>
-                    <span className="text-neutral-500">Lowlight:</span>{' '}
-                    {(lowlight?.chips || []).join(', ') || '—'} {lowlight?.coachFlag ? '(coach reach-out)' : ''}
-                  </div>
-                  <div>
-                    <span className="text-neutral-500">Notes:</span>{' '}
-                    {lowlight?.notes?.trim() || '—'}
-                  </div>
-                </>
-              )}
             </div>
+
+            {rating !== null && rating <= 1 && (
+              <div className="space-y-3">
+                <div className="mb-2 text-sm text-neutral-300">
+                  Rough day — anything specific? (optional)
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {DEFAULT_CHIPS.map((c) => {
+                    const active = lowlight?.chips?.includes(c) ?? false
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        className={`badge ${active ? 'border-misfit-red text-misfit-red' : ''}`}
+                        onClick={() => {
+                          const chips = new Set(lowlight?.chips || [])
+                          active ? chips.delete(c) : chips.add(c)
+                          setLowlight({
+                            coachFlag: lowlight?.coachFlag ?? false,
+                            note: lowlight?.note,
+                            chips: Array.from(chips),
+                          })
+                        }}
+                      >
+                        {c}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={lowlight?.coachFlag ?? false}
+                    onChange={(e) =>
+                      setLowlight({
+                        chips: lowlight?.chips || [],
+                        note: lowlight?.note,
+                        coachFlag: e.target.checked,
+                      })
+                    }
+                  />
+                  Would like coach to reach out
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-sm text-neutral-300">Anything else? (optional)</span>
+                  <textarea
+                    className="w-full min-h-20 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-neutral-500 focus:border-white/20 focus:outline-none"
+                    placeholder="Add a quick note…"
+                    value={lowlight?.note || ''}
+                    onChange={(e) =>
+                      setLowlight({
+                        chips: lowlight?.chips || [],
+                        coachFlag: lowlight?.coachFlag ?? false,
+                        note: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+            )}
 
             <div className="flex justify-between">
               <button
                 className="rounded-xl border border-white/15 px-4 py-2 text-sm text-neutral-200 hover:bg-white/5"
-                onClick={() => setStep(showRough ? 3 : 2)}
+                onClick={() => setStep(2)}
               >
                 Back
               </button>
