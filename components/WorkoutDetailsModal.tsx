@@ -73,17 +73,14 @@ export function WorkoutDetailsModal({
   onClose: () => void
   address: string
   onSubmit: (meta: Omit<CheckinMeta, 'version' | 'userId' | 'checkinAt'>) => Promise<void>
-}): JSX.Element | null {
-  // Steps are strictly 1 → 2 → 3
+}): null | React.ReactElement {
+  // Strict 3-step flow
   const [step, setStep] = useState<1 | 2 | 3>(1)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [rating, setRating] = useState<number | null>(null)
-
-  // Extend Lowlight with an optional free-text note for rough days
   const [lowlight, setLowlight] = useState<(Lowlight & { note?: string }) | undefined>(undefined)
-
   const [saving, setSaving] = useState(false)
 
   const totalSteps = 3
@@ -92,23 +89,13 @@ export function WorkoutDetailsModal({
 
   const titleRef = useRef<HTMLInputElement | null>(null)
 
-  // Guard step never exceeds totalSteps (future-proofing if logic changes)
-  useEffect(() => {
-    setStep((s) => (s > totalSteps ? totalSteps : s))
-  }, [totalSteps])
-
-  // Open lifecycle: load draft and focus title
   useEffect(() => {
     if (!open) return
     const d = loadDraft(address)
     if (d) {
       if (typeof d.title === 'string') setTitle(d.title)
       if (typeof d.description === 'string') setDescription(d.description)
-      if (typeof d.rating === 'number' && d.rating >= 0 && d.rating <= 5) {
-        setRating(d.rating)
-      } else {
-        setRating(null)
-      }
+      if (typeof d.rating === 'number' && d.rating >= 0 && d.rating <= 5) setRating(d.rating)
       if (d.lowlight) setLowlight(d.lowlight as any)
     }
     setStep(1)
@@ -116,7 +103,6 @@ export function WorkoutDetailsModal({
     return () => clearTimeout(t)
   }, [open, address])
 
-  // Autosave every 1.5s
   useEffect(() => {
     if (!open) return
     const id = setInterval(() => {
@@ -126,7 +112,6 @@ export function WorkoutDetailsModal({
     return () => clearInterval(id)
   }, [open, address, title, description, rating, lowlight])
 
-  // Esc to close
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -136,7 +121,6 @@ export function WorkoutDetailsModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  // Enter to continue on Step 1 (unless Shift or inside textarea)
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
@@ -172,7 +156,7 @@ export function WorkoutDetailsModal({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4">
-      {/* overlay (click to close) */}
+      {/* overlay */}
       <button
         aria-label="Close"
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -275,7 +259,7 @@ export function WorkoutDetailsModal({
           </div>
         )}
 
-        {/* STEP 3: Review (+ rough day inputs if rating ≤ 1) */}
+        {/* STEP 3: Review (+ rough day if rating ≤ 1) */}
         {step === 3 && (
           <div className="space-y-5">
             <div className="text-sm text-neutral-400">Review</div>
