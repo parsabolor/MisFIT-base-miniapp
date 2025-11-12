@@ -1,13 +1,14 @@
 'use client'
 
 import type { Address } from 'viem'
-import { useReadContract, useWriteContract, useAccount, usePublicClient } from 'wagmi'
-import { baseSepolia } from 'wagmi/chains'
+import { useReadContract, useWriteContract } from 'wagmi'
+import { waitForTransactionReceipt } from 'wagmi/actions'
 import { MISFIT_CHECKINS_ABI } from '@/contracts/abi/misfitCheckins'
+import { wagmiConfig, baseSepolia } from '@/lib/wagmiConfig'
 
 export const CHECKINS_ADDR = (process.env.NEXT_PUBLIC_CHECKINS_ADDRESS || '') as Address
 
-// ----- READS -----
+// Reads (unchanged)
 export function useOnchainStats(address?: Address) {
   return useReadContract({
     address: CHECKINS_ADDR,
@@ -28,35 +29,28 @@ export function useCheckedInToday(address?: Address) {
   })
 }
 
-// ----- WRITE (waits for confirmation on Base Sepolia public client) -----
+// Write: attempt on-chain (Base Sepolia). If it fails, just return {ok:false}.
 export function useCheckInWrite() {
-  const { chainId } = useAccount()
   const { writeContractAsync, isPending } = useWriteContract()
-  const publicClient = usePublicClient({ chainId: baseSepolia.id })
 
-  async function checkInAndWait() {
-    if (!CHECKINS_ADDR) throw new Error('Contract address missing')
-
-    // Require Base Sepolia at time of write
-    if (chainId !== baseSepolia.id) {
-      const err: any = new Error('Wrong network')
-      err.code = 'WRONG_NETWORK'
-      throw err
+  async function tryOnchainCheckIn(): Promise<{ ok: boolean; hash?: `0x${string}`; error?: string }> {
+    if (!CHECKINS_ADDR) return { ok: false, error: 'Contract address missing' }
+    try {
+      const hash = await writeContractAsync({
+        chainId: baseSepolia.id,         // wallet may prompt to switch/add chain
+        address: CHECKINS_ADDR,
+        abi: MISFIT_CHECKINS_ABI,
+        functionName: 'checkIn',
+      })
+      await waitForTransactionReceipt(wagmiConfig, { hash })
+      return { ok: true, hash }
+    } catch (e: any) {
+      return {
+        ok: false,
+        error: e?.shortMessage || e?.message || 'On-chain check-in skipped',
+      }
     }
-
-    // Send on Base Sepolia explicitly to avoid wallets defaulting to Ethereum
-    const hash = await writeContractAsync({
-      chainId: baseSepolia.id,
-      address: CHECKINS_ADDR,
-      abi: MISFIT_CHECKINS_ABI,
-      functionName: 'checkIn',
-    })
-
-    // Wait on the Base Sepolia-bound public client
-    // (prevents "requested resource not found" from mismatched RPCs)
-    await publicClient!.waitForTransactionReceipt({ hash })
-    return hash
   }
 
-  return { checkInAndWait, isPending }
+  return { tryOnchainCheckIn, isPending }
 }
