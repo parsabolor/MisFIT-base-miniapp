@@ -4,26 +4,26 @@ import { baseSepolia } from 'wagmi/chains'
 import { wagmiConfig } from '@/providers/WagmiProvider'
 
 /**
- * Force switch to Base Sepolia (84532) using several fallbacks:
- * 1) @wagmi/core switchChain
- * 2) Connector-level switchChain
- * 3) Raw EIP-3326 / 3085 on any injected provider (MetaMask, CBW, etc.)
- * Finally reconnects wagmi so useChainId() updates immediately.
+ * Force switch to Base Sepolia (84532) with multiple fallbacks,
+ * then reconnect wagmi so useChainId() updates in the UI.
  */
 export async function forceSwitchToBaseSepolia(): Promise<void> {
-  const target = baseSepolia.id
+  const target = baseSepolia.id // 84532
+  const hex84532 = '0x14a34'
+  const rpcUrl =
+    process.env.NEXT_PUBLIC_ALCHEMY_BASE_SEPOLIA || 'https://sepolia.base.org'
 
-  // --- 1) @wagmi/core action -----------------------------
+  // 1) Wagmi core action (preferred)
   try {
     const { switchChain } = await import('@wagmi/core')
     await switchChain(wagmiConfig, { chainId: target })
     await refreshWagmi()
     return
-  } catch (e) {
-    // ignore; try next path
+  } catch {
+    // continue to fallbacks
   }
 
-  // --- 2) Connector-level switch (works for WalletConnect, etc.) ---
+  // 2) Active connector-level switch (WalletConnect, etc.)
   try {
     const { getConnections } = await import('@wagmi/core')
     const conns = getConnections(wagmiConfig)
@@ -33,26 +33,21 @@ export async function forceSwitchToBaseSepolia(): Promise<void> {
       await refreshWagmi()
       return
     }
-  } catch (e) {
-    // ignore; try next path
+  } catch {
+    // continue to fallbacks
   }
 
-  // --- 3) Raw wallet RPC (EIP-3326 + EIP-3085) ------------
-  const hex84532 = '0x14a34'
-  const rpc =
-    process.env.NEXT_PUBLIC_ALCHEMY_BASE_SEPOLIA || 'https://sepolia.base.org'
-
-  // Some wallets expose multiple providers
-  const providers: any[] = []
+  // 3) Raw wallet RPC (MetaMask / Coinbase / injected)
+  const candidates: any[] = []
   const eth: any = (globalThis as any).ethereum
-  if (eth?.providers?.length) providers.push(...eth.providers)
-  if (eth) providers.push(eth)
+  if (eth?.providers?.length) candidates.push(...eth.providers)
+  if (eth) candidates.push(eth)
 
   let lastErr: any = null
-  for (const p of providers) {
+  for (const p of candidates) {
     if (!p?.request) continue
+
     try {
-      // Try direct switch first
       await p.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: hex84532 }],
@@ -61,7 +56,7 @@ export async function forceSwitchToBaseSepolia(): Promise<void> {
       return
     } catch (err: any) {
       lastErr = err
-      // If the chain is unknown, add + switch
+      // Chain not added
       if (err?.code === 4902) {
         try {
           await p.request({
@@ -71,7 +66,7 @@ export async function forceSwitchToBaseSepolia(): Promise<void> {
                 chainId: hex84532,
                 chainName: 'Base Sepolia',
                 nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-                rpcUrls: [rpc],
+                rpcUrls: [rpcUrl],
                 blockExplorerUrls: ['https://sepolia.basescan.org'],
               },
             ],
@@ -89,12 +84,10 @@ export async function forceSwitchToBaseSepolia(): Promise<void> {
     }
   }
 
-  // If we got here, everything failed
-  throw lastErr ?? new Error('Unable to switch network')
+  throw lastErr ?? new Error('Unable to switch to Base Sepolia')
 }
 
 async function refreshWagmi() {
-  // Make wagmi reflect the new chain immediately
   const { reconnect } = await import('@wagmi/core')
   await reconnect(wagmiConfig)
 }
